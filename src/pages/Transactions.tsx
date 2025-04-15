@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import { Plus } from 'lucide-react';
-import { TransactionItem } from '../components/transaction/TransactionItem';
-import { Modal } from '../components/shared/Modal';
-import { AddTransactionForm } from '../components/transaction/AddTransactionForm';
+import React, { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
+import { Plus } from "lucide-react";
+import { TransactionItem } from "../components/transaction/TransactionItem";
+import { Modal } from "../components/shared/Modal";
+import { AddTransactionForm } from "../components/transaction/AddTransactionForm";
 
 interface Transaction {
   id: string;
@@ -15,7 +15,6 @@ interface Transaction {
   budget?: {
     name: string;
   } | null;
-  type?: 'transaction' | 'deposit';
 }
 
 interface Budget {
@@ -30,15 +29,10 @@ export function Transactions() {
   const [isLoading, setIsLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [formData, setFormData] = useState({
-    budget_id: '',
-    amount: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
-  });
-  const [depositData, setDepositData] = useState({
-    amount: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
+    budget_id: "",
+    amount: "",
+    description: "",
+    date: new Date().toISOString().split("T")[0],
   });
 
   useEffect(() => {
@@ -48,41 +42,30 @@ export function Transactions() {
 
   async function fetchTransactions() {
     try {
-      const [transactionsResult, depositsResult] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select(`
-            id,
-            budget_id,
-            amount,
-            description,
-            date,
-            budget:budgets(name)
-          `)
-          .eq('user_id', user.id),
-        supabase
-          .from('deposits')
-          .select('id, amount, description, date')
-          .eq('user_id', user.id)
-      ]);
+      const { data, error } = await supabase
+        .from("transactions")
+        .select(
+          `
+          id,
+          budget_id,
+          amount,
+          description,
+          date,
+          budget:budgets(name)
+        `
+        )
+        .eq("user_id", user.id);
 
-      if (transactionsResult.error) throw transactionsResult.error;
-      if (depositsResult.error) throw depositsResult.error;
+      if (error) throw error;
 
-      // Combine and sort transactions and deposits
-      const allTransactions = [
-        ...(transactionsResult.data || []).map(t => ({ ...t, type: 'transaction' as const })),
-        ...(depositsResult.data || []).map(d => ({
-          ...d,
-          budget_id: null,
-          budget: null,
-          type: 'deposit' as const
-        }))
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Sort transactions by date
+      const sortedTransactions = (data || []).sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
 
-      setTransactions(allTransactions);
+      setTransactions(sortedTransactions);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error("Error fetching transactions:", error);
     } finally {
       setIsLoading(false);
     }
@@ -91,79 +74,55 @@ export function Transactions() {
   async function fetchBudgets() {
     try {
       const { data, error } = await supabase
-        .from('budgets')
-        .select('id, name')
-        .eq('user_id', user.id);
+        .from("budgets")
+        .select("id, name")
+        .eq("user_id", user.id);
 
       if (error) throw error;
       setBudgets(data || []);
     } catch (error) {
-      console.error('Error fetching budgets:', error);
+      console.error("Error fetching budgets:", error);
     }
   }
 
-  async function handleSubmit(e: React.FormEvent, type: 'spending' | 'deposit') {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      if (type === 'spending') {
-        const { error } = await supabase.from('transactions').insert({
-          user_id: user.id,
-          budget_id: formData.budget_id,
-          amount: -Math.abs(parseFloat(formData.amount)), // Ensure spending is negative
-          description: formData.description,
-          date: formData.date,
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('deposits').insert({
-          user_id: user.id,
-          amount: Math.abs(parseFloat(depositData.amount)), // Ensure deposit is positive
-          description: depositData.description,
-          date: depositData.date,
-          timeframe: 'monthly', // Default timeframe
-        });
-        if (error) throw error;
-      }
+      const { error } = await supabase.from("transactions").insert({
+        user_id: user.id,
+        budget_id: formData.budget_id || null, // Allow null budget_id for income transactions
+        amount: parseFloat(formData.amount), // Can be positive (income) or negative (expense)
+        description: formData.description,
+        date: formData.date,
+      });
+
+      if (error) throw error;
 
       setFormData({
-        budget_id: '',
-        amount: '',
-        description: '',
-        date: new Date().toISOString().split('T')[0],
+        budget_id: "",
+        amount: "",
+        description: "",
+        date: new Date().toISOString().split("T")[0],
       });
-      setDepositData({
-        amount: '',
-        description: '',
-        date: new Date().toISOString().split('T')[0],
-      });
+
       setShowTransactionModal(false);
       fetchTransactions();
     } catch (error) {
-      console.error('Error adding transaction:', error);
+      console.error("Error adding transaction:", error);
     }
   }
 
   async function handleDelete(id: string) {
     try {
-      // Try to delete from transactions first
-      let { error: transactionError } = await supabase
-        .from('transactions')
+      const { error } = await supabase
+        .from("transactions")
         .delete()
-        .eq('id', id);
+        .eq("id", id);
 
-      // If no transaction was deleted, try deposits
-      if (transactionError) {
-        const { error: depositError } = await supabase
-          .from('deposits')
-          .delete()
-          .eq('id', id);
-          
-        if (depositError) throw depositError;
-      }
-
+      if (error) throw error;
       fetchTransactions();
     } catch (error) {
-      console.error('Error deleting transaction:', error);
+      console.error("Error deleting transaction:", error);
     }
   }
 
@@ -184,12 +143,18 @@ export function Transactions() {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="min-w-full divide-y divide-gray-200">
           <div className="bg-gray-50 px-6 py-3">
-            <h2 className="text-lg font-medium text-gray-900">Recent Transactions</h2>
+            <h2 className="text-lg font-medium text-gray-900">
+              Recent Transactions
+            </h2>
           </div>
           {isLoading ? (
-            <div className="p-6 text-center text-gray-500">Loading transactions...</div>
+            <div className="p-6 text-center text-gray-500">
+              Loading transactions...
+            </div>
           ) : transactions.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">No transactions found</div>
+            <div className="p-6 text-center text-gray-500">
+              No transactions found
+            </div>
           ) : (
             <div className="divide-y divide-gray-200 px-6">
               {transactions.map((transaction) => (
@@ -215,10 +180,8 @@ export function Transactions() {
       >
         <AddTransactionForm
           formData={formData}
-          depositData={depositData}
           onSubmit={handleSubmit}
           onChange={(data) => setFormData({ ...formData, ...data })}
-          onDepositChange={(data) => setDepositData({ ...depositData, ...data })}
           budgets={budgets}
         />
       </Modal>
