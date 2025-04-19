@@ -13,6 +13,7 @@ interface Transaction {
   amount: number;
   description: string;
   date: string;
+  assigned_date: string;
   budget?: {
     name: string;
   } | null;
@@ -64,8 +65,8 @@ export function Transactions() {
   }, [filterType, customFilter, allTransactions]);
 
   const sortTransactions = (a: Transaction, b: Transaction) => {
-    const dateA = parseISO(a.date);
-    const dateB = parseISO(b.date);
+    const dateA = parseISO(a.assigned_date);
+    const dateB = parseISO(b.assigned_date);
     const dateDiff = dateB.getTime() - dateA.getTime();
     
     // If dates are the same, sort by description
@@ -82,7 +83,7 @@ export function Transactions() {
     switch (filterType) {
       case 'current-month':
         filteredTransactions = allTransactions.filter(t => {
-          const date = parseISO(t.date);
+          const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(now),
             end: endOfMonth(now)
@@ -92,7 +93,7 @@ export function Transactions() {
       case 'last-month':
         const lastMonth = subMonths(now, 1);
         filteredTransactions = allTransactions.filter(t => {
-          const date = parseISO(t.date);
+          const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(lastMonth),
             end: endOfMonth(lastMonth)
@@ -102,7 +103,7 @@ export function Transactions() {
       case 'last-3-months':
         const threeMonthsAgo = subMonths(now, 3);
         filteredTransactions = allTransactions.filter(t => {
-          const date = parseISO(t.date);
+          const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(threeMonthsAgo),
             end: endOfMonth(now)
@@ -111,7 +112,7 @@ export function Transactions() {
         break;
       case 'custom':
         filteredTransactions = allTransactions.filter(t => {
-          const date = parseISO(t.date);
+          const date = parseISO(t.assigned_date);
           return (
             date.getFullYear().toString() === customFilter.year &&
             format(date, 'MMMM') === customFilter.month
@@ -120,7 +121,7 @@ export function Transactions() {
         break;
     }
 
-    // Sort transactions by date and description
+    // Sort transactions by assigned date and description
     filteredTransactions.sort(sortTransactions);
 
     const groupedData = groupTransactionsByDate(filteredTransactions);
@@ -133,7 +134,7 @@ export function Transactions() {
 
   const groupTransactionsByDate = (transactionList: Transaction[]): GroupedTransactions => {
     return transactionList.reduce((groups: GroupedTransactions, transaction) => {
-      const date = parseISO(transaction.date);
+      const date = parseISO(transaction.assigned_date);
       const year = date.getFullYear().toString();
       const month = format(date, "MMMM");
 
@@ -145,7 +146,7 @@ export function Transactions() {
       }
       groups[year][month].push(transaction);
 
-      // Sort transactions within each month by date and description
+      // Sort transactions within each month by assigned date and description
       groups[year][month].sort(sortTransactions);
       
       return groups;
@@ -163,11 +164,12 @@ export function Transactions() {
           amount,
           description,
           date,
+          assigned_date,
           budget:budgets(name)
         `
         )
         .eq("user_id", user.id)
-        .order('date', { ascending: false })
+        .order('assigned_date', { ascending: false })
         .order('description', { ascending: true });
 
       if (error) throw error;
@@ -209,6 +211,7 @@ export function Transactions() {
         amount: parseFloat(formData.amount),
         description: formData.description,
         date: formData.date,
+        assigned_date: formData.date,
       });
 
       if (error) throw error;
@@ -257,8 +260,8 @@ export function Transactions() {
   };
 
   const getAvailableYearsAndMonths = () => {
-    const years = Array.from(new Set(allTransactions.map(t => parseISO(t.date).getFullYear()))).sort((a, b) => b - a);
-    const months = Array.from(new Set(allTransactions.map(t => format(parseISO(t.date), 'MMMM'))));
+    const years = Array.from(new Set(allTransactions.map(t => parseISO(t.assigned_date).getFullYear()))).sort((a, b) => b - a);
+    const months = Array.from(new Set(allTransactions.map(t => format(parseISO(t.assigned_date), 'MMMM'))));
     return { years, months };
   };
 
@@ -375,8 +378,10 @@ export function Transactions() {
                                     description={transaction.description}
                                     amount={transaction.amount}
                                     date={transaction.date}
+                                    assignedDate={transaction.assigned_date}
                                     budgetName={transaction.budget?.name}
                                     onDelete={handleDelete}
+                                    onAssignedDateChange={fetchTransactions}
                                   />
                                 ))}
                               </div>

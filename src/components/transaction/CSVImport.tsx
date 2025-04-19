@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDate, cleanAmount, cleanDescription } from '../../utils/dateParser';
 import { format, parseISO } from 'date-fns';
+import { Amount } from '../shared/Amount';
 
 interface CSVTransaction {
   date: string;
@@ -264,6 +265,7 @@ export function CSVImport({ onTransactionsLoaded, budgets, onClose }: CSVImportP
           amount: parseFloat(transaction.amount),
           description: transaction.description,
           date: transaction.date,
+          assigned_date: transaction.date,
           budget_id: null,
         });
 
@@ -398,12 +400,8 @@ export function CSVImport({ onTransactionsLoaded, budgets, onClose }: CSVImportP
                   <td className="px-4 py-2 text-sm text-gray-900">
                     {transaction.description}
                   </td>
-                  <td
-                    className={`px-4 py-2 text-sm font-medium text-right whitespace-nowrap ${
-                      parseFloat(transaction.amount) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}
-                  >
-                    ${Math.abs(parseFloat(transaction.amount)).toFixed(2)}
+                  <td className="px-4 py-2 text-sm text-right whitespace-nowrap">
+                    <Amount value={parseFloat(transaction.amount)} />
                   </td>
                 </tr>
               ))}

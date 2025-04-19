@@ -39,6 +39,34 @@ export function AddTransactionForm({
   const [activeTab, setActiveTab] = useState<"manual" | "bulk">("manual");
   const [importedTransactions, setImportedTransactions] = useState<CSVTransaction[]>([]);
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const { error } = await supabase.from("transactions").insert({
+        user_id: user.id,
+        budget_id: formData.budget_id || null,
+        amount: parseFloat(formData.amount),
+        description: formData.description,
+        date: formData.date,
+        assigned_date: formData.date, // Set assigned_date equal to date by default
+      });
+
+      if (error) throw error;
+
+      setFormData({
+        budget_id: "",
+        amount: "",
+        description: "",
+        date: new Date().toISOString().split("T")[0],
+      });
+
+      setShowTransactionModal(false);
+      fetchTransactions();
+    } catch (error) {
+      console.error("Error adding transaction:", error);
+    }
+  }
+
   const handleTransactionsLoaded = (transactions: CSVTransaction[]) => {
     setImportedTransactions(transactions);
     if (onBulkImport) {
