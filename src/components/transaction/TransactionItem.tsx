@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 
 interface TransactionItemProps {
   id: string;
@@ -25,7 +26,7 @@ export function TransactionItem({
     <div className="flex items-center justify-between py-2 text-sm">
       <div className="flex items-center gap-4">
         <span className="text-gray-500 min-w-[100px]">
-          {new Date(date).toLocaleDateString()}
+          {format(parseISO(date), 'PPP')}
         </span>
         <div>
           <span className="font-medium text-gray-900">
