@@ -10,7 +10,7 @@ interface TransactionItemProps {
   amount: number;
   date: string;
   assignedDate: string;
-  budgetName?: string;
+  categoryName?: string;
   onDelete?: (id: string) => void;
   onAssignedDateChange?: () => void;
 }
@@ -21,7 +21,7 @@ export function TransactionItem({
   amount, 
   date,
   assignedDate,
-  budgetName, 
+  categoryName, 
   onDelete,
   onAssignedDateChange
 }: TransactionItemProps) {
@@ -83,9 +83,9 @@ export function TransactionItem({
           <span className="font-medium text-gray-900">
             {description}
           </span>
-          {budgetName && (
+          {categoryName && (
             <span className="text-gray-500 ml-2">
-              • {budgetName}
+              • {categoryName}
             </span>
           )}
         </div>

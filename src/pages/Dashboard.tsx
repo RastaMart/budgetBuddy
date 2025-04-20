@@ -4,19 +4,19 @@ import { useAuth } from '../contexts/AuthContext';
 
 export function Dashboard() {
   const { user } = useAuth();
-  const [budgetCount, setBudgetCount] = useState<number | null>(null);
+  const [categoryCount, setCategoryCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function checkSupabaseConnection() {
       try {
         const { count, error } = await supabase
-          .from('budgets')
+          .from('categories')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id);
 
         if (error) throw error;
-        setBudgetCount(count);
+        setCategoryCount(count);
       } catch (err) {
         console.error('Error:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -38,7 +38,7 @@ export function Dashboard() {
           <div className="space-y-2">
             <p className="text-green-600">✓ Supabase connection successful!</p>
             <p className="text-gray-600">
-              You have {budgetCount === null ? '...' : budgetCount} budget{budgetCount === 1 ? '' : 's'} in your account.
+              You have {categoryCount === null ? '...' : categoryCount} {categoryCount === 1 ? 'category' : 'categories'} in your account.
             </p>
             <p className="text-gray-600">
               User ID: {user.id}

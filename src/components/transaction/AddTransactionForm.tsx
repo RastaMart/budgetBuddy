@@ -4,7 +4,7 @@ import { CSVImport } from "./CSVImport";
 import { Modal } from "../shared/Modal";
 
 interface FormData {
-  budget_id: string;
+  category_id: string;
   amount: string;
   description: string;
   date: string;
@@ -14,15 +14,15 @@ interface CSVTransaction {
   date: string;
   description: string;
   amount: string;
-  budget?: string;
+  category?: string;
 }
 
 interface AddTransactionFormProps {
   formData: FormData;
   onSubmit: (e: React.FormEvent) => void;
   onChange: (data: Partial<FormData>) => void;
-  budgets: Array<{ id: string; name: string }>;
-  selectedBudgetId?: string;
+  categories: Array<{ id: string; name: string }>;
+  selectedCategoryId?: string;
   onBulkImport?: (transactions: CSVTransaction[]) => void;
   onClose?: () => void;
 }
@@ -31,41 +31,13 @@ export function AddTransactionForm({
   formData,
   onSubmit,
   onChange,
-  budgets,
-  selectedBudgetId,
+  categories,
+  selectedCategoryId,
   onBulkImport,
   onClose,
 }: AddTransactionFormProps) {
   const [activeTab, setActiveTab] = useState<"manual" | "bulk">("manual");
   const [importedTransactions, setImportedTransactions] = useState<CSVTransaction[]>([]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const { error } = await supabase.from("transactions").insert({
-        user_id: user.id,
-        budget_id: formData.budget_id || null,
-        amount: parseFloat(formData.amount),
-        description: formData.description,
-        date: formData.date,
-        assigned_date: formData.date, // Set assigned_date equal to date by default
-      });
-
-      if (error) throw error;
-
-      setFormData({
-        budget_id: "",
-        amount: "",
-        description: "",
-        date: new Date().toISOString().split("T")[0],
-      });
-
-      setShowTransactionModal(false);
-      fetchTransactions();
-    } catch (error) {
-      console.error("Error adding transaction:", error);
-    }
-  }
 
   const handleTransactionsLoaded = (transactions: CSVTransaction[]) => {
     setImportedTransactions(transactions);
@@ -104,25 +76,24 @@ export function AddTransactionForm({
       {activeTab === "manual" && (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
-            {!selectedBudgetId && (
+            {!selectedCategoryId && (
               <div>
                 <label
-                  htmlFor="budget"
+                  htmlFor="category"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Budget
+                  Category
                 </label>
                 <select
-                  id="budget"
+                  id="category"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  value={formData.budget_id}
-                  onChange={(e) => onChange({ budget_id: e.target.value })}
-                  required
+                  value={formData.category_id}
+                  onChange={(e) => onChange({ category_id: e.target.value })}
                 >
-                  <option value="">Select a budget</option>
-                  {budgets.map((budget) => (
-                    <option key={budget.id} value={budget.id}>
-                      {budget.name}
+                  <option value="">Select a category</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
                     </option>
                   ))}
                 </select>
@@ -199,7 +170,7 @@ export function AddTransactionForm({
         <div className="space-y-6">
           <CSVImport
             onTransactionsLoaded={handleTransactionsLoaded}
-            budgets={budgets}
+            categories={categories}
             onClose={onClose}
           />
         </div>

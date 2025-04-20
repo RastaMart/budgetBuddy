@@ -9,17 +9,17 @@ import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval
 
 interface Transaction {
   id: string;
-  budget_id: string | null;
+  category_id: string | null;
   amount: number;
   description: string;
   date: string;
   assigned_date: string;
-  budget?: {
+  category?: {
     name: string;
   } | null;
 }
 
-interface Budget {
+interface Category {
   id: string;
   name: string;
 }
@@ -37,7 +37,7 @@ export function Transactions() {
   const [transactions, setTransactions] = useState<GroupedTransactions>({});
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [filterType, setFilterType] = useState<FilterType>('last-month');
@@ -47,7 +47,7 @@ export function Transactions() {
   });
 
   const [formData, setFormData] = useState({
-    budget_id: "",
+    category_id: "",
     amount: "",
     description: "",
     date: new Date().toISOString().split("T")[0],
@@ -55,7 +55,7 @@ export function Transactions() {
 
   useEffect(() => {
     fetchTransactions();
-    fetchBudgets();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -160,12 +160,12 @@ export function Transactions() {
         .select(
           `
           id,
-          budget_id,
+          category_id,
           amount,
           description,
           date,
           assigned_date,
-          budget:budgets(name)
+          category:categories(name)
         `
         )
         .eq("user_id", user.id)
@@ -188,17 +188,17 @@ export function Transactions() {
     }
   }
 
-  async function fetchBudgets() {
+  async function fetchCategories() {
     try {
       const { data, error } = await supabase
-        .from("budgets")
+        .from("categories")
         .select("id, name")
         .eq("user_id", user.id);
 
       if (error) throw error;
-      setBudgets(data || []);
+      setCategories(data || []);
     } catch (error) {
-      console.error("Error fetching budgets:", error);
+      console.error("Error fetching categories:", error);
     }
   }
 
@@ -207,7 +207,7 @@ export function Transactions() {
     try {
       const { error } = await supabase.from("transactions").insert({
         user_id: user.id,
-        budget_id: formData.budget_id || null,
+        category_id: formData.category_id || null,
         amount: parseFloat(formData.amount),
         description: formData.description,
         date: formData.date,
@@ -217,7 +217,7 @@ export function Transactions() {
       if (error) throw error;
 
       setFormData({
-        budget_id: "",
+        category_id: "",
         amount: "",
         description: "",
         date: new Date().toISOString().split("T")[0],
@@ -379,7 +379,7 @@ export function Transactions() {
                                     amount={transaction.amount}
                                     date={transaction.date}
                                     assignedDate={transaction.assigned_date}
-                                    budgetName={transaction.budget?.name}
+                                    categoryName={transaction.category?.name}
                                     onDelete={handleDelete}
                                     onAssignedDateChange={fetchTransactions}
                                   />
@@ -406,7 +406,7 @@ export function Transactions() {
           formData={formData}
           onSubmit={handleSubmit}
           onChange={(data) => setFormData({ ...formData, ...data })}
-          budgets={budgets}
+          categories={categories}
           onClose={handleModalClose}
         />
       </Modal>

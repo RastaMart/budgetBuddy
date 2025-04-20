@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, X } from 'lucide-react';
-import { Budget } from '../types/budget';
-import { BudgetSection } from '../components/budget/BudgetSection';
+import { Category } from '../types/category';
+import { CategorySection } from '../components/budget/CategorySection';
 import { AddBudgetForm } from '../components/budget/AddBudgetForm';
 
 export function Budgets() {
   const { user } = useAuth();
-  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -18,28 +18,28 @@ export function Budgets() {
   });
 
   useEffect(() => {
-    fetchBudgets();
+    fetchCategories();
     // Refresh data every minute to keep progress bars updated
-    const interval = setInterval(fetchBudgets, 60000);
+    const interval = setInterval(fetchCategories, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  async function fetchBudgets() {
+  async function fetchCategories() {
     try {
-      const { data: budgetsData, error: budgetsError } = await supabase
-        .from('budgets')
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (budgetsError) throw budgetsError;
+      if (categoriesError) throw categoriesError;
 
-      const budgetsWithSpending = await Promise.all(
-        (budgetsData || []).map(async (budget) => {
+      const categoriesWithSpending = await Promise.all(
+        (categoriesData || []).map(async (category) => {
           const { data: transactionsData, error: transactionsError } = await supabase
             .from('transactions')
             .select('amount')
-            .eq('budget_id', budget.id);
+            .eq('category_id', category.id);
 
           if (transactionsError) throw transactionsError;
 
@@ -49,15 +49,15 @@ export function Budgets() {
           );
 
           return {
-            ...budget,
+            ...category,
             total_spent: totalSpent,
           };
         })
       );
 
-      setBudgets(budgetsWithSpending);
+      setCategories(categoriesWithSpending);
     } catch (error) {
-      console.error('Error fetching budgets:', error);
+      console.error('Error fetching categories:', error);
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +66,7 @@ export function Budgets() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('budgets').insert({
+      const { error } = await supabase.from('categories').insert({
         user_id: user.id,
         name: formData.name,
         amount: parseFloat(formData.amount),
@@ -81,7 +81,7 @@ export function Budgets() {
         timeframe: 'monthly',
       });
       setShowForm(false);
-      fetchBudgets();
+      fetchCategories();
     } catch (error) {
       console.error('Error adding budget:', error);
     }
@@ -90,12 +90,12 @@ export function Budgets() {
   async function handleDelete(id: string) {
     try {
       const { error } = await supabase
-        .from('budgets')
+        .from('categories')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-      fetchBudgets();
+      fetchCategories();
     } catch (error) {
       console.error('Error deleting budget:', error);
     }
@@ -104,7 +104,7 @@ export function Budgets() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-gray-900">Budgets</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Categories</h1>
         <button
           onClick={() => setShowForm(!showForm)}
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -133,31 +133,31 @@ export function Budgets() {
 
       {isLoading ? (
         <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
-          Loading budgets...
+          Loading categories...
         </div>
-      ) : budgets.length === 0 ? (
+      ) : categories.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
-          No budgets found
+          No categories found
         </div>
       ) : (
         <div className="space-y-6">
-          <BudgetSection 
-            budgets={budgets} 
+          <CategorySection 
+            categories={categories} 
             timeframe="weekly" 
             onDelete={handleDelete} 
-            onTransactionAdded={fetchBudgets}
+            onTransactionAdded={fetchCategories}
           />
-          <BudgetSection 
-            budgets={budgets} 
+          <CategorySection 
+            categories={categories} 
             timeframe="monthly" 
             onDelete={handleDelete} 
-            onTransactionAdded={fetchBudgets}
+            onTransactionAdded={fetchCategories}
           />
-          <BudgetSection 
-            budgets={budgets} 
+          <CategorySection 
+            categories={categories} 
             timeframe="yearly" 
             onDelete={handleDelete} 
-            onTransactionAdded={fetchBudgets}
+            onTransactionAdded={fetchCategories}
           />
         </div>
       )}
