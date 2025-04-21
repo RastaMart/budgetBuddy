@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { BudgetUser } from "../../services/budgetService";
+import { Avatar } from "../ui/Avatar"; // Import the new Avatar component
 
 interface BudgetHeaderProps {
   users: BudgetUser[];
@@ -16,22 +17,14 @@ export function BudgetHeader({ users, onShare, onDelete }: BudgetHeaderProps) {
         <div className="flex items-center gap-2">
           <div className="flex -space-x-2">
             {users.map((budgetUser) => (
-              <div
-                key={budgetUser.user_id}
-                className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center ring-2 ring-white"
-              >
-                {budgetUser.profiles.avatar_url ? (
-                  <img
-                    src={budgetUser.profiles.avatar_url}
-                    alt={budgetUser.profiles.name || budgetUser.profiles.email}
-                    className="h-8 w-8 rounded-full"
-                  />
-                ) : (
-                  <span className="text-sm font-medium text-gray-600">
-                    {(budgetUser.profiles.name ||
-                      budgetUser.profiles.email)[0].toUpperCase()}
-                  </span>
-                )}
+              <div key={budgetUser.user_id}>
+                <Avatar
+                  avatarUrl={budgetUser.profiles.avatar_url}
+                  name={budgetUser.profiles.name}
+                  email={budgetUser.profiles.email}
+                  size="md"
+                  showRing={true}
+                />
               </div>
             ))}
             <button
