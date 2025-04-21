@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, ChevronRight, ChevronDown } from 'lucide-react';
-import { ProgressBar } from './ProgressBar';
-import { Category } from '../../types/category';
-import { getTimeProgress } from '../../utils/timeProgress';
-import { Modal } from '../shared/Modal';
-import { AddTransactionForm } from '../transaction/AddTransactionForm';
-import { TransactionItem } from '../transaction/TransactionItem';
-import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import React, { useState, useEffect } from "react";
+import { Trash2, Plus, ChevronRight, ChevronDown } from "lucide-react";
+import { ProgressBar } from "./ProgressBar";
+import { Category } from "../../types/category";
+import { getTimeProgress } from "../../utils/timeProgress";
+import { Modal } from "../shared/Modal";
+import { AddTransactionForm } from "../transaction/AddTransactionForm";
+import { TransactionItem } from "../transaction/TransactionItem";
+import { useAuth } from "../../hooks/useContext";
+import { supabase } from "../../lib/supabase";
 
 interface Transaction {
   id: string;
@@ -23,21 +23,26 @@ interface CategoryItemProps {
   onTransactionAdded: () => void;
 }
 
-export function CategoryItem({ category, timeframe, onDelete, onTransactionAdded }: CategoryItemProps) {
+export function CategoryItem({
+  category,
+  timeframe,
+  onDelete,
+  onTransactionAdded,
+}: CategoryItemProps) {
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [formData, setFormData] = useState({
     category_id: category.id,
-    amount: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    description: "",
+    date: new Date().toISOString().split("T")[0],
   });
   const [depositData, setDepositData] = useState({
-    amount: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    description: "",
+    date: new Date().toISOString().split("T")[0],
   });
 
   const spentPercentage = ((category.total_spent || 0) / category.amount) * 100;
@@ -52,24 +57,27 @@ export function CategoryItem({ category, timeframe, onDelete, onTransactionAdded
   async function fetchTransactions() {
     try {
       const { data, error } = await supabase
-        .from('transactions')
-        .select('id, amount, description, date, assigned_date')
-        .eq('category_id', category.id)
-        .order('date', { ascending: false });
+        .from("transactions")
+        .select("id, amount, description, date, assigned_date")
+        .eq("category_id", category.id)
+        .order("date", { ascending: false });
 
       if (error) throw error;
       setTransactions(data || []);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error("Error fetching transactions:", error);
     }
   }
 
-  async function handleSubmit(e: React.FormEvent, type: 'spending' | 'deposit') {
+  async function handleSubmit(
+    e: React.FormEvent,
+    type: "spending" | "deposit"
+  ) {
     e.preventDefault();
-    if (type === 'deposit') return; // Deposits not allowed in category view
-    
+    if (type === "deposit") return; // Deposits not allowed in category view
+
     try {
-      const { error } = await supabase.from('transactions').insert({
+      const { error } = await supabase.from("transactions").insert({
         user_id: user.id,
         category_id: formData.category_id,
         amount: parseFloat(formData.amount),
@@ -81,9 +89,9 @@ export function CategoryItem({ category, timeframe, onDelete, onTransactionAdded
 
       setFormData({
         category_id: category.id,
-        amount: '',
-        description: '',
-        date: new Date().toISOString().split('T')[0],
+        amount: "",
+        description: "",
+        date: new Date().toISOString().split("T")[0],
       });
       setShowTransactionModal(false);
       onTransactionAdded();
@@ -91,7 +99,7 @@ export function CategoryItem({ category, timeframe, onDelete, onTransactionAdded
         fetchTransactions();
       }
     } catch (error) {
-      console.error('Error adding transaction:', error);
+      console.error("Error adding transaction:", error);
     }
   }
 
@@ -112,9 +120,12 @@ export function CategoryItem({ category, timeframe, onDelete, onTransactionAdded
                     <ChevronRight className="w-5 h-5" />
                   )}
                 </button>
-                <h3 className="text-lg font-medium text-gray-900">{category.name}</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  {category.name}
+                </h3>
                 <span className="text-sm text-gray-500">
-                  ${category.total_spent?.toFixed(2) || '0.00'}/${category.amount.toFixed(2)} spent
+                  ${category.total_spent?.toFixed(2) || "0.00"}/$
+                  {category.amount.toFixed(2)} spent
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -133,9 +144,9 @@ export function CategoryItem({ category, timeframe, onDelete, onTransactionAdded
               </div>
             </div>
             <div className="mt-2">
-              <ProgressBar 
-                spentPercentage={spentPercentage} 
-                timeProgress={timeProgress} 
+              <ProgressBar
+                spentPercentage={spentPercentage}
+                timeProgress={timeProgress}
               />
             </div>
 
@@ -172,7 +183,9 @@ export function CategoryItem({ category, timeframe, onDelete, onTransactionAdded
           depositData={depositData}
           onSubmit={handleSubmit}
           onChange={(data) => setFormData({ ...formData, ...data })}
-          onDepositChange={(data) => setDepositData({ ...depositData, ...data })}
+          onDepositChange={(data) =>
+            setDepositData({ ...depositData, ...data })
+          }
           categorys={[{ id: category.id, name: category.name }]}
           selectedCategoryId={category.id}
         />

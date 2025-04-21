@@ -1,7 +1,7 @@
-import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
-import { Home, PieChart, Receipt, Settings, LogOut } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import React from "react";
+import { Outlet, NavLink } from "react-router-dom";
+import { Home, PieChart, Receipt, Settings, LogOut } from "lucide-react";
+import { useAuth } from "../hooks/useContext";
 
 export function Layout() {
   const { signOut, profile } = useAuth();
@@ -20,8 +20,8 @@ export function Layout() {
               className={({ isActive }) =>
                 `flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
                   isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`
               }
             >
@@ -33,8 +33,8 @@ export function Layout() {
               className={({ isActive }) =>
                 `flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
                   isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`
               }
             >
@@ -46,8 +46,8 @@ export function Layout() {
               className={({ isActive }) =>
                 `flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
                   isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`
               }
             >
@@ -62,8 +62,8 @@ export function Layout() {
               className={({ isActive }) =>
                 `flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
                   isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`
               }
             >
@@ -87,7 +87,9 @@ export function Layout() {
                   </div>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-900">{profile?.name || profile?.email}</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {profile?.name || profile?.email}
+                  </p>
                 </div>
               </div>
             </div>

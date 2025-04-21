@@ -1,157 +1,195 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import React, { createContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import type { User } from "@supabase/supabase-js";
+
+interface Profile {
+  id: string;
+  email: string;
+  name: string | null;
+  avatar_url: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
-  profile: {
-    id: string;
-    email: string;
-    name: string | null;
-    avatar_url: string | null;
-  } | null;
+  profile: Profile | null;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  createOrFetchProfile: (user: User) => Promise<void>;
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   signIn: async () => {},
   signInWithGoogle: async () => {},
   signUp: async () => {},
   signOut: async () => {},
+  createOrFetchProfile: async () => {},
   loading: true,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<AuthContextType['profile']>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  console.log('AuthProvider');
-  
+
   useEffect(() => {
-    // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('getSession');
       setUser(session?.user ?? null);
       if (session?.user) {
         createOrFetchProfile(session.user);
       }
       setLoading(false);
     });
-
-    // Listen for changes on auth state (signed in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('onAuthStateChange');
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        await createOrFetchProfile(session.user);
-      } else {
-        setProfile(null);
-      }
       setLoading(false);
-
-      // // Handle redirect after auth events
-      // if (event === 'SIGNED_IN') {
-      //   // navigate('/', { replace: true });
-      // } else if (event === 'SIGNED_OUT') {
-      //   // navigate('/auth/login', { replace: true });
-      // }
     });
+    return () => subscription.unsubscribe();
+  }, []);
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
+  // useEffect(() => {
+  //   let mounted = true;
+
+  //   // Check active sessions and sets the user
+  //   async function initialSession() {
+  //     try {
+  //       console.log("Checking initial session...");
+  //       const { data, error } = await supabase.auth.getSession();
+  //       console.log("Session data:", data);
+  //       console.log("Session error:", error);
+  //       // if (error) {
+  //       //   console.error("Error getting session", error);
+  //       // }
+  //       // const { session } = data;
+  //       // console.log("Session data:", session);
+
+  //       setUser(session?.user ?? null);
+  //       // if (session?.user) {
+  //       //   console.log("Session user:", session.user);
+  //       //   await createOrFetchProfile(session.user);
+  //       // }
+  //     } catch (error) {
+  //       console.error("Session check error:", error);
+  //     } finally {
+  //       console.log("finally");
+  //       setLoading(false);
+  //     }
+  //   }
+
+  //   initialSession();
+
+  //   // Listen for changes on auth state (signed in, signed out, etc.)
+  //   const {
+  //     data: { subscription },
+  //   } = supabase.auth.onAuthStateChange(async (event, session) => {
+  //     // if (!mounted) return;
+  //     console.log("Auth state changed:", event, session);
+  //     setUser(session?.user ?? null);
+  //     console.log("User:", session?.user);
+  //     if (session?.user) {
+  //       await createOrFetchProfile(session.user);
+  //     } else {
+  //       setProfile(null);
+  //       setLoading(false);
+  //     }
+  //   });
+
+  //   return () => {
+  //     // mounted = false;
+  //     subscription.unsubscribe();
+  //   };
+  // }, []);
 
   async function createOrFetchProfile(user: User) {
     try {
+      console.log("Creating or fetching profile for user:", user);
       // First try to fetch existing profile
-      let { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
-  
-      if (fetchError && fetchError.code === 'PGRST116') {
+      console.log("Existing profile data:", existingProfile);
+      if (existingProfile) {
+        setProfile(existingProfile);
+      } else {
+        console.log("Profile not found, creating a new one...");
         // Profile doesn't exist, create it
         const { data: newProfile, error: insertError } = await supabase
-          .from('profiles')
+          .from("profiles")
           .insert([
             {
               id: user.id,
               email: user.email,
               name: user.user_metadata.full_name || user.email,
-              avatar_url: user.user_metadata.avatar_url
-            }
+              avatar_url: user.user_metadata.avatar_url,
+            },
           ])
           .select()
           .single();
-  
+
         if (insertError) throw insertError;
-        existingProfile = newProfile;
-      } else if (fetchError) {
-        throw fetchError;
+        setProfile(newProfile);
       }
-  
-      setProfile(existingProfile);
+      setLoading(false);
     } catch (error) {
-      console.error('Error handling profile:', error);
+      console.error("Error handling profile:", error);
+      // Reset loading state even if there's an error
+      setLoading(false);
     }
   }
-  
   async function signIn(email: string, password: string) {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+
       if (error) {
-        if (error.message === 'Invalid login credentials') {
-          throw new Error('Invalid email or password');
+        if (error.message === "Invalid login credentials") {
+          throw new Error("Invalid email or password");
         }
         throw error;
       }
-      navigate('/', { replace: true });
-    } catch (error) {
+
+      navigate("/", { replace: true });
+    } catch (error: any) {
+      console.error("Sign in error:", error);
       throw error;
     }
   }
 
   async function signInWithGoogle() {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) throw error;
-    } catch (error) {
-      throw error;
-    }
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
   }
 
   async function signUp(email: string, password: string) {
     try {
-      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
-      
+
       if (signUpError) throw signUpError;
-      if (!user) throw new Error('User creation failed');
+      if (!data.user) throw new Error("User creation failed");
 
       // Profile creation is handled by createOrFetchProfile via onAuthStateChange
     } catch (error: any) {
-      console.error('Signup error:', error);
-      throw new Error(error.message || 'Failed to create account');
+      console.error("Signup error:", error);
+      throw new Error(error.message || "Failed to create account");
     }
   }
 
@@ -159,26 +197,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      navigate('/', { replace: true });
+      navigate("/auth/login", { replace: true });
     } catch (error) {
+      console.error("Sign out error:", error);
       throw error;
     }
   }
 
-  return (
-    <AuthContext.Provider value={{
-      user,
-      profile,
-      signIn,
-      signInWithGoogle,
-      signUp,
-      signOut,
-      loading,
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    profile,
+    signIn,
+    signInWithGoogle,
+    signUp,
+    signOut,
+    createOrFetchProfile,
+    loading,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-
-export const useAuth = () => useContext(AuthContext);

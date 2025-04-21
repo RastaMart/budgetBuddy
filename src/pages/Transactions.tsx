@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useContext";
 import { Plus, ChevronDown, ChevronRight, Filter } from "lucide-react";
 import { TransactionItem } from "../components/transaction/TransactionItem";
 import { Modal } from "../components/shared/Modal";
 import { AddTransactionForm } from "../components/transaction/AddTransactionForm";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import {
+  format,
+  parseISO,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  isWithinInterval,
+} from "date-fns";
 
 interface Transaction {
   id: string;
@@ -30,7 +37,7 @@ interface GroupedTransactions {
   };
 }
 
-type FilterType = 'last-month' | 'current-month' | 'last-3-months' | 'custom';
+type FilterType = "last-month" | "current-month" | "last-3-months" | "custom";
 
 export function Transactions() {
   const { user } = useAuth();
@@ -40,10 +47,10 @@ export function Transactions() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [filterType, setFilterType] = useState<FilterType>('last-month');
+  const [filterType, setFilterType] = useState<FilterType>("last-month");
   const [customFilter, setCustomFilter] = useState({
     year: new Date().getFullYear().toString(),
-    month: format(new Date(), 'MMMM')
+    month: format(new Date(), "MMMM"),
   });
 
   const [formData, setFormData] = useState({
@@ -68,7 +75,7 @@ export function Transactions() {
     const dateA = parseISO(a.assigned_date);
     const dateB = parseISO(b.assigned_date);
     const dateDiff = dateB.getTime() - dateA.getTime();
-    
+
     // If dates are the same, sort by description
     if (dateDiff === 0) {
       return a.description.localeCompare(b.description);
@@ -81,41 +88,41 @@ export function Transactions() {
     const now = new Date();
 
     switch (filterType) {
-      case 'current-month':
-        filteredTransactions = allTransactions.filter(t => {
+      case "current-month":
+        filteredTransactions = allTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(now),
-            end: endOfMonth(now)
+            end: endOfMonth(now),
           });
         });
         break;
-      case 'last-month':
+      case "last-month":
         const lastMonth = subMonths(now, 1);
-        filteredTransactions = allTransactions.filter(t => {
+        filteredTransactions = allTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(lastMonth),
-            end: endOfMonth(lastMonth)
+            end: endOfMonth(lastMonth),
           });
         });
         break;
-      case 'last-3-months':
+      case "last-3-months":
         const threeMonthsAgo = subMonths(now, 3);
-        filteredTransactions = allTransactions.filter(t => {
+        filteredTransactions = allTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(threeMonthsAgo),
-            end: endOfMonth(now)
+            end: endOfMonth(now),
           });
         });
         break;
-      case 'custom':
-        filteredTransactions = allTransactions.filter(t => {
+      case "custom":
+        filteredTransactions = allTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return (
             date.getFullYear().toString() === customFilter.year &&
-            format(date, 'MMMM') === customFilter.month
+            format(date, "MMMM") === customFilter.month
           );
         });
         break;
@@ -126,31 +133,36 @@ export function Transactions() {
 
     const groupedData = groupTransactionsByDate(filteredTransactions);
     setTransactions(groupedData);
-    
+
     // Set all years as expanded by default
     const years = Object.keys(groupedData);
     setExpandedGroups(new Set(years));
   };
 
-  const groupTransactionsByDate = (transactionList: Transaction[]): GroupedTransactions => {
-    return transactionList.reduce((groups: GroupedTransactions, transaction) => {
-      const date = parseISO(transaction.assigned_date);
-      const year = date.getFullYear().toString();
-      const month = format(date, "MMMM");
+  const groupTransactionsByDate = (
+    transactionList: Transaction[]
+  ): GroupedTransactions => {
+    return transactionList.reduce(
+      (groups: GroupedTransactions, transaction) => {
+        const date = parseISO(transaction.assigned_date);
+        const year = date.getFullYear().toString();
+        const month = format(date, "MMMM");
 
-      if (!groups[year]) {
-        groups[year] = {};
-      }
-      if (!groups[year][month]) {
-        groups[year][month] = [];
-      }
-      groups[year][month].push(transaction);
+        if (!groups[year]) {
+          groups[year] = {};
+        }
+        if (!groups[year][month]) {
+          groups[year][month] = [];
+        }
+        groups[year][month].push(transaction);
 
-      // Sort transactions within each month by assigned date and description
-      groups[year][month].sort(sortTransactions);
-      
-      return groups;
-    }, {});
+        // Sort transactions within each month by assigned date and description
+        groups[year][month].sort(sortTransactions);
+
+        return groups;
+      },
+      {}
+    );
   };
 
   async function fetchTransactions() {
@@ -169,15 +181,15 @@ export function Transactions() {
         `
         )
         .eq("user_id", user.id)
-        .order('assigned_date', { ascending: false })
-        .order('description', { ascending: true });
+        .order("assigned_date", { ascending: false })
+        .order("description", { ascending: true });
 
       if (error) throw error;
 
       setAllTransactions(data || []);
       const groupedData = groupTransactionsByDate(data || []);
       setTransactions(groupedData);
-      
+
       // Set all years as expanded by default
       const years = Object.keys(groupedData);
       setExpandedGroups(new Set(years));
@@ -260,8 +272,16 @@ export function Transactions() {
   };
 
   const getAvailableYearsAndMonths = () => {
-    const years = Array.from(new Set(allTransactions.map(t => parseISO(t.assigned_date).getFullYear()))).sort((a, b) => b - a);
-    const months = Array.from(new Set(allTransactions.map(t => format(parseISO(t.assigned_date), 'MMMM'))));
+    const years = Array.from(
+      new Set(
+        allTransactions.map((t) => parseISO(t.assigned_date).getFullYear())
+      )
+    ).sort((a, b) => b - a);
+    const months = Array.from(
+      new Set(
+        allTransactions.map((t) => format(parseISO(t.assigned_date), "MMMM"))
+      )
+    );
     return { years, months };
   };
 
@@ -295,24 +315,32 @@ export function Transactions() {
             <option value="custom">Custom</option>
           </select>
 
-          {filterType === 'custom' && (
+          {filterType === "custom" && (
             <div className="flex gap-2">
               <select
                 value={customFilter.year}
-                onChange={(e) => setCustomFilter({ ...customFilter, year: e.target.value })}
+                onChange={(e) =>
+                  setCustomFilter({ ...customFilter, year: e.target.value })
+                }
                 className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               >
-                {years.map(year => (
-                  <option key={year} value={year}>{year}</option>
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
                 ))}
               </select>
               <select
                 value={customFilter.month}
-                onChange={(e) => setCustomFilter({ ...customFilter, month: e.target.value })}
+                onChange={(e) =>
+                  setCustomFilter({ ...customFilter, month: e.target.value })
+                }
                 className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               >
-                {months.map(month => (
-                  <option key={month} value={month}>{month}</option>
+                {months.map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
                 ))}
               </select>
             </div>
@@ -364,7 +392,10 @@ export function Transactions() {
                             return dateB.getTime() - dateA.getTime();
                           })
                           .map(([month, monthTransactions]) => (
-                            <div key={`${year}-${month}`} className="bg-gray-50">
+                            <div
+                              key={`${year}-${month}`}
+                              className="bg-gray-50"
+                            >
                               <div className="px-6 py-2 bg-gray-100">
                                 <h3 className="text-sm font-medium text-gray-700">
                                   {month}
