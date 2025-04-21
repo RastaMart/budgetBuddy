@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "../shared/Modal";
 
 interface DeleteBudgetModalProps {
@@ -16,14 +16,29 @@ export function DeleteBudgetModal({
 }: DeleteBudgetModalProps) {
   const [confirmation, setConfirmation] = useState("");
 
+  // Reset confirmation text when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setConfirmation("");
+    }
+  }, [isOpen]);
+
   const handleClose = () => {
     setConfirmation("");
     onClose();
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (confirmation === budgetName) {
+      onDelete();
+      setConfirmation(""); // Reset confirmation after successful deletion
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Delete Budget">
-      <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-gray-500">
           This action cannot be undone. This will permanently delete the budget
           and all its categories and transactions.
@@ -54,15 +69,14 @@ export function DeleteBudgetModal({
             Cancel
           </button>
           <button
-            type="button"
-            onClick={onDelete}
+            type="submit"
             disabled={confirmation !== budgetName}
             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Delete Budget
           </button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }
