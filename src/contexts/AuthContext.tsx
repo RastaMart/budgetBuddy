@@ -8,6 +8,7 @@ interface Profile {
   email: string;
   name: string | null;
   avatar_url: string | null;
+  timezone: string;
 }
 
 interface AuthContextType {
@@ -55,59 +56,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // useEffect(() => {
-  //   let mounted = true;
-
-  //   // Check active sessions and sets the user
-  //   async function initialSession() {
-  //     try {
-  //       console.log("Checking initial session...");
-  //       const { data, error } = await supabase.auth.getSession();
-  //       console.log("Session data:", data);
-  //       console.log("Session error:", error);
-  //       // if (error) {
-  //       //   console.error("Error getting session", error);
-  //       // }
-  //       // const { session } = data;
-  //       // console.log("Session data:", session);
-
-  //       setUser(session?.user ?? null);
-  //       // if (session?.user) {
-  //       //   console.log("Session user:", session.user);
-  //       //   await createOrFetchProfile(session.user);
-  //       // }
-  //     } catch (error) {
-  //       console.error("Session check error:", error);
-  //     } finally {
-  //       console.log("finally");
-  //       setLoading(false);
-  //     }
-  //   }
-
-  //   initialSession();
-
-  //   // Listen for changes on auth state (signed in, signed out, etc.)
-  //   const {
-  //     data: { subscription },
-  //   } = supabase.auth.onAuthStateChange(async (event, session) => {
-  //     // if (!mounted) return;
-  //     console.log("Auth state changed:", event, session);
-  //     setUser(session?.user ?? null);
-  //     console.log("User:", session?.user);
-  //     if (session?.user) {
-  //       await createOrFetchProfile(session.user);
-  //     } else {
-  //       setProfile(null);
-  //       setLoading(false);
-  //     }
-  //   });
-
-  //   return () => {
-  //     // mounted = false;
-  //     subscription.unsubscribe();
-  //   };
-  // }, []);
-
   async function createOrFetchProfile(user: User) {
     try {
       console.log("Creating or fetching profile for user:", user);
@@ -131,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: user.email,
               name: user.user_metadata.full_name || user.email,
               avatar_url: user.user_metadata.avatar_url,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             },
           ])
           .select()
@@ -142,10 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     } catch (error) {
       console.error("Error handling profile:", error);
-      // Reset loading state even if there's an error
       setLoading(false);
     }
   }
+
   async function signIn(email: string, password: string) {
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -181,12 +130,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+        },
       });
 
       if (signUpError) throw signUpError;
       if (!data.user) throw new Error("User creation failed");
 
-      // Profile creation is handled by createOrFetchProfile via onAuthStateChange
     } catch (error: any) {
       console.error("Signup error:", error);
       throw new Error(error.message || "Failed to create account");

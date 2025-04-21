@@ -5,6 +5,7 @@ import { Plus, ChevronDown, ChevronRight, Filter } from "lucide-react";
 import { TransactionItem } from "../components/transaction/TransactionItem";
 import { Modal } from "../components/shared/Modal";
 import { AddTransactionForm } from "../components/transaction/AddTransactionForm";
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import {
   format,
   parseISO,
@@ -12,6 +13,8 @@ import {
   startOfMonth,
   endOfMonth,
   isWithinInterval,
+  subDays,
+  endOfDay,
 } from "date-fns";
 
 interface Transaction {
@@ -37,17 +40,17 @@ interface GroupedTransactions {
   };
 }
 
-type FilterType = "last-month" | "current-month" | "last-3-months" | "custom";
+type FilterType = "recent" | "last-month" | "current-month" | "last-3-months" | "custom";
 
 export function Transactions() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [transactions, setTransactions] = useState<GroupedTransactions>({});
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [filterType, setFilterType] = useState<FilterType>("last-month");
+  const [filterType, setFilterType] = useState<FilterType>("recent");
   const [customFilter, setCustomFilter] = useState({
     year: new Date().getFullYear().toString(),
     month: format(new Date(), "MMMM"),
@@ -57,7 +60,7 @@ export function Transactions() {
     category_id: "",
     amount: "",
     description: "",
-    date: new Date().toISOString().split("T")[0],
+    date: toZonedTime(new Date(), profile?.timezone || 'UTC'),
   });
 
   useEffect(() => {
@@ -88,6 +91,16 @@ export function Transactions() {
     const now = new Date();
 
     switch (filterType) {
+      case "recent":
+        const thirtyOneDaysAgo = subDays(now, 31);
+        filteredTransactions = allTransactions.filter((t) => {
+          const date = parseISO(t.assigned_date);
+          return isWithinInterval(date, {
+            start: thirtyOneDaysAgo,
+            end: endOfDay(now),
+          });
+        });
+        break;
       case "current-month":
         filteredTransactions = allTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
@@ -186,8 +199,15 @@ export function Transactions() {
 
       if (error) throw error;
 
-      setAllTransactions(data || []);
-      const groupedData = groupTransactionsByDate(data || []);
+      // Convert UTC dates to local timezone for display
+      const localData = data?.map(transaction => ({
+        ...transaction,
+        // date: toZonedTime(transaction.date, profile?.timezone || 'UTC'),
+        //assigned_date: toZonedTime(transaction.assigned_date, profile?.timezone || 'UTC')
+      })) || [];
+
+      setAllTransactions(localData);
+      const groupedData = groupTransactionsByDate(localData);
       setTransactions(groupedData);
 
       // Set all years as expanded by default
@@ -217,13 +237,14 @@ export function Transactions() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
+      const utcDate = fromZonedTime(new Date(formData.date), profile?.timezone || 'UTC');
       const { error } = await supabase.from("transactions").insert({
         user_id: user.id,
         category_id: formData.category_id || null,
         amount: parseFloat(formData.amount),
         description: formData.description,
-        date: formData.date,
-        assigned_date: formData.date,
+        date: utcDate,
+        assigned_date: utcDate,
       });
 
       if (error) throw error;
@@ -232,7 +253,7 @@ export function Transactions() {
         category_id: "",
         amount: "",
         description: "",
-        date: new Date().toISOString().split("T")[0],
+        date: toZonedTime(new Date().toISOString(), profile?.timezone || 'UTC'),
       });
 
       setShowTransactionModal(false);
@@ -309,8 +330,9 @@ export function Transactions() {
             onChange={(e) => setFilterType(e.target.value as FilterType)}
             className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           >
-            <option value="last-month">Last Month</option>
+            <option value="recent">Recent (31 days)</option>
             <option value="current-month">Current Month</option>
+            <option value="last-month">Last Month</option>
             <option value="last-3-months">Last 3 Months</option>
             <option value="custom">Custom</option>
           </select>

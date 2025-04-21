@@ -101,33 +101,37 @@ export function Budgets() {
   async function handleCreateBudget(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const { data, error } = await supabase
+      setIsLoading(true);
+      const { error: errorInsert } = await supabase
         .from("budgets")
-        .insert({ name: newBudgetName })
-        .select()
-        .single();
+        .insert({ name: newBudgetName });
 
-      if (error) throw error;
-
-      if (data) {
-        // Add user as owner
-        const { error: userError } = await supabase
-          .from("budget_users")
-          .insert({
-            budget_id: data.id,
-            user_id: user.id,
-            role: "owner",
-          });
-
-        if (userError) throw userError;
-
-        setBudgets([...budgets, data]);
-        setSelectedBudget(data.id);
+      if (errorInsert) throw errorInsert;
+      const { data, error: errorRead } = await supabase
+        .from("budgets")
+        .select(
+          `
+          id,
+          name,
+          budget_users!inner(user_id)
+        `
+        )
+        .eq("budget_users.user_id", user.id);
+  
+        if (errorRead) throw errorRead;
+        setBudgets(data || []);
+  
+        // Select first budget by default
+        if (data && data.length > 0) {
+          setSelectedBudget(data[data.length-1].id);
+        }
         setNewBudgetName("");
         setShowNewBudgetForm(false);
-      }
+      
     } catch (error) {
       console.error("Error creating budget:", error);
+    } finally {
+      setIsLoading(false);
     }
   }
 

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { CSVImport } from "./CSVImport";
 import { Modal } from "../shared/Modal";
+import { useAuth } from "../../hooks/useContext";
+import { toZonedTime } from "date-fns-tz";
 
 interface FormData {
   category_id: string;
@@ -36,6 +38,7 @@ export function AddTransactionForm({
   onBulkImport,
   onClose,
 }: AddTransactionFormProps) {
+  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<"manual" | "bulk">("manual");
   const [importedTransactions, setImportedTransactions] = useState<CSVTransaction[]>([]);
 
@@ -45,6 +48,9 @@ export function AddTransactionForm({
       onBulkImport(transactions);
     }
   };
+
+  // Get today's date in user's timezone
+  const today = toZonedTime(new Date().toISOString(), profile?.timezone || 'UTC');
 
   return (
     <div>
@@ -146,7 +152,7 @@ export function AddTransactionForm({
                 type="date"
                 id="date"
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={formData.date}
+                value={formData.date || today}
                 onChange={(e) => onChange({ date: e.target.value })}
                 required
               />
