@@ -1,10 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useContext";
 import { Plus, X } from "lucide-react";
 import { Budget, Category } from "../types/budget";
 import { CategorySection } from "../components/budget/CategorySection";
 import { AddCategoryForm } from "../components/budget/AddCategoryForm";
+import { BudgetTabs } from "../components/budget/BudgetTabs";
+import { BudgetHeader } from "../components/budget/BudgetHeader";
+import { NewBudgetForm } from "../components/budget/NewBudgetForm";
+import { ShareBudgetModal } from "../components/budget/ShareBudgetModal";
+import { DeleteBudgetModal } from "../components/budget/DeleteBudgetModal";
+import {
+  BudgetUser,
+  fetchUserBudgets,
+  createBudget,
+  deleteBudget,
+  fetchBudgetUsers,
+  shareBudgetWithUser,
+  fetchCategories,
+  createCategory,
+  deleteCategory,
+} from "../services/budgetService";
 
 export function Budgets() {
   const { user } = useAuth();
@@ -14,7 +29,11 @@ export function Budgets() {
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showNewBudgetForm, setShowNewBudgetForm] = useState(false);
-  const [newBudgetName, setNewBudgetName] = useState("");
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>(
+    {}
+  );
   const [formData, setFormData] = useState({
     name: "",
     amount: "",
@@ -22,35 +41,31 @@ export function Budgets() {
   });
 
   useEffect(() => {
-    fetchBudgets();
+    fetchUserBudgetsData();
   }, []);
 
   useEffect(() => {
     if (selectedBudget) {
-      fetchCategories();
+      fetchCategoriesData();
+      fetchBudgetUsersData(selectedBudget);
     }
   }, [selectedBudget]);
 
-  async function fetchBudgets() {
+  async function fetchUserBudgetsData() {
     try {
-      const { data, error } = await supabase
-        .from("budgets")
-        .select(
-          `
-          id,
-          name,
-          budget_users!inner(user_id)
-        `
-        )
-        .eq("budget_users.user_id", user.id);
-
-      if (error) throw error;
-      setBudgets(data || []);
+      setIsLoading(true);
+      const data = await fetchUserBudgets(user.id);
+      setBudgets(data);
 
       // Select first budget by default
-      if (data && data.length > 0 && !selectedBudget) {
+      if (data.length > 0 && !selectedBudget) {
         setSelectedBudget(data[0].id);
       }
+
+      // Fetch users for all budgets
+      await Promise.all(
+        data?.map((budget) => fetchBudgetUsersData(budget.id)) || []
+      );
     } catch (error) {
       console.error("Error fetching budgets:", error);
     } finally {
@@ -58,76 +73,41 @@ export function Budgets() {
     }
   }
 
-  async function fetchCategories() {
+  async function fetchBudgetUsersData(budgetId: string) {
+    try {
+      const users = await fetchBudgetUsers(budgetId);
+      setBudgetUsers((prev) => ({
+        ...prev,
+        [budgetId]: users,
+      }));
+    } catch (error) {
+      console.error("Error fetching budget users:", error);
+    }
+  }
+
+  async function fetchCategoriesData() {
     if (!selectedBudget) return;
 
     try {
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("categories")
-        .select("*")
-        .eq("budget_id", selectedBudget)
-        .order("created_at", { ascending: false });
-
-      if (categoriesError) throw categoriesError;
-
-      const categoriesWithSpending = await Promise.all(
-        (categoriesData || []).map(async (category) => {
-          const { data: transactionsData, error: transactionsError } =
-            await supabase
-              .from("transactions")
-              .select("amount")
-              .eq("category_id", category.id);
-
-          if (transactionsError) throw transactionsError;
-
-          const totalSpent = (transactionsData || []).reduce(
-            (sum, transaction) => sum + Number(transaction.amount),
-            0
-          );
-
-          return {
-            ...category,
-            total_spent: totalSpent,
-          };
-        })
-      );
-
-      setCategories(categoriesWithSpending);
+      const categoriesData = await fetchCategories(selectedBudget);
+      setCategories(categoriesData);
     } catch (error) {
       console.error("Error fetching categories:", error);
     }
   }
 
-  async function handleCreateBudget(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreateBudget(name: string) {
     try {
       setIsLoading(true);
-      const { error: errorInsert } = await supabase
-        .from("budgets")
-        .insert({ name: newBudgetName });
+      await createBudget(name);
+      const data = await fetchUserBudgets(user.id);
+      setBudgets(data);
 
-      if (errorInsert) throw errorInsert;
-      const { data, error: errorRead } = await supabase
-        .from("budgets")
-        .select(
-          `
-          id,
-          name,
-          budget_users!inner(user_id)
-        `
-        )
-        .eq("budget_users.user_id", user.id);
-  
-        if (errorRead) throw errorRead;
-        setBudgets(data || []);
-  
-        // Select first budget by default
-        if (data && data.length > 0) {
-          setSelectedBudget(data[data.length-1].id);
-        }
-        setNewBudgetName("");
-        setShowNewBudgetForm(false);
-      
+      // Select the newly created budget
+      if (data.length > 0) {
+        setSelectedBudget(data[data.length - 1].id);
+      }
+      setShowNewBudgetForm(false);
     } catch (error) {
       console.error("Error creating budget:", error);
     } finally {
@@ -135,20 +115,18 @@ export function Budgets() {
     }
   }
 
-  async function handleCreateCategory(e: React.FormEvent) {
+  async function handleCreateCategorySubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedBudget) return;
 
     try {
-      const { error } = await supabase.from("categories").insert({
-        budget_id: selectedBudget,
-        user_id: user.id,
-        name: formData.name,
-        amount: parseFloat(formData.amount),
-        timeframe: formData.timeframe,
-      });
-
-      if (error) throw error;
+      await createCategory(
+        selectedBudget,
+        user.id,
+        formData.name,
+        parseFloat(formData.amount),
+        formData.timeframe
+      );
 
       setFormData({
         name: "",
@@ -156,20 +134,44 @@ export function Budgets() {
         timeframe: "monthly",
       });
       setShowForm(false);
-      fetchCategories();
+      fetchCategoriesData();
     } catch (error) {
       console.error("Error adding category:", error);
     }
   }
 
-  async function handleDeleteCategory(id: string) {
+  async function handleDeleteCategorySubmit(id: string) {
     try {
-      const { error } = await supabase.from("categories").delete().eq("id", id);
-
-      if (error) throw error;
-      fetchCategories();
+      await deleteCategory(id);
+      fetchCategoriesData();
     } catch (error) {
       console.error("Error deleting category:", error);
+    }
+  }
+
+  async function handleShareBudgetSubmit(email: string) {
+    if (!selectedBudget) return;
+
+    try {
+      await shareBudgetWithUser(selectedBudget, email);
+      setShowShareModal(false);
+      await fetchBudgetUsersData(selectedBudget);
+    } catch (error) {
+      console.error("Error sharing budget:", error);
+    }
+  }
+
+  async function handleDeleteBudgetSubmit() {
+    if (!selectedBudget) return;
+
+    try {
+      await deleteBudget(selectedBudget);
+
+      setBudgets((prev) => prev.filter((b) => b.id !== selectedBudget));
+      setSelectedBudget(budgets[0]?.id || null);
+      setShowDeleteModal(false);
+    } catch (error) {
+      console.error("Error deleting budget:", error);
     }
   }
 
@@ -183,76 +185,37 @@ export function Budgets() {
     );
   }
 
+  const selectedBudgetUsers = selectedBudget
+    ? budgetUsers[selectedBudget] || []
+    : [];
+  const currentBudget = budgets.find((b) => b.id === selectedBudget);
+
   return (
     <div className="space-y-6">
       {/* Budget Tabs */}
-      <div className="border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <nav className="-mb-px flex space-x-8" aria-label="Budgets">
-            {budgets.map((budget) => (
-              <button
-                key={budget.id}
-                onClick={() => setSelectedBudget(budget.id)}
-                className={`
-                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                  ${
-                    selectedBudget === budget.id
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }
-                `}
-              >
-                {budget.name}
-              </button>
-            ))}
-          </nav>
-          <button
-            onClick={() => setShowNewBudgetForm(true)}
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            New Budget
-          </button>
-        </div>
-      </div>
+      <BudgetTabs
+        budgets={budgets}
+        selectedBudget={selectedBudget}
+        budgetUsers={budgetUsers}
+        onSelectBudget={setSelectedBudget}
+        onNewBudget={() => setShowNewBudgetForm(true)}
+      />
+
+      {/* Budget Actions */}
+      {selectedBudget && (
+        <BudgetHeader
+          users={selectedBudgetUsers}
+          onShare={() => setShowShareModal(true)}
+          onDelete={() => setShowDeleteModal(true)}
+        />
+      )}
 
       {/* New Budget Form */}
       {showNewBudgetForm && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <form onSubmit={handleCreateBudget} className="space-y-4">
-            <div>
-              <label
-                htmlFor="budgetName"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Budget Name
-              </label>
-              <input
-                type="text"
-                id="budgetName"
-                value={newBudgetName}
-                onChange={(e) => setNewBudgetName(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowNewBudgetForm(false)}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Create Budget
-              </button>
-            </div>
-          </form>
-        </div>
+        <NewBudgetForm
+          onSubmit={handleCreateBudget}
+          onCancel={() => setShowNewBudgetForm(false)}
+        />
       )}
 
       {/* Categories Section */}
@@ -281,7 +244,7 @@ export function Budgets() {
           {showForm && (
             <AddCategoryForm
               formData={formData}
-              onSubmit={handleCreateCategory}
+              onSubmit={handleCreateCategorySubmit}
               onChange={(data) => setFormData({ ...formData, ...data })}
             />
           )}
@@ -295,25 +258,39 @@ export function Budgets() {
               <CategorySection
                 categories={categories}
                 timeframe="weekly"
-                onDelete={handleDeleteCategory}
-                onTransactionAdded={fetchCategories}
+                onDelete={handleDeleteCategorySubmit}
+                onTransactionAdded={fetchCategoriesData}
               />
               <CategorySection
                 categories={categories}
                 timeframe="monthly"
-                onDelete={handleDeleteCategory}
-                onTransactionAdded={fetchCategories}
+                onDelete={handleDeleteCategorySubmit}
+                onTransactionAdded={fetchCategoriesData}
               />
               <CategorySection
                 categories={categories}
                 timeframe="yearly"
-                onDelete={handleDeleteCategory}
-                onTransactionAdded={fetchCategories}
+                onDelete={handleDeleteCategorySubmit}
+                onTransactionAdded={fetchCategoriesData}
               />
             </div>
           )}
         </>
       )}
+
+      {/* Modals */}
+      <ShareBudgetModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        onShare={handleShareBudgetSubmit}
+      />
+
+      <DeleteBudgetModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onDelete={handleDeleteBudgetSubmit}
+        budgetName={currentBudget?.name || ""}
+      />
     </div>
   );
 }
