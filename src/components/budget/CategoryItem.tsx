@@ -14,6 +14,7 @@ interface Transaction {
   amount: number;
   description: string;
   date: string;
+  assigned_date: string;
 }
 
 interface CategoryItemProps {
@@ -123,10 +124,19 @@ export function CategoryItem({
                 <h3 className="text-lg font-medium text-gray-900">
                   {category.name}
                 </h3>
-                <span className="text-sm text-gray-500">
-                  ${category.total_spent?.toFixed(2) || "0.00"}/$
-                  {category.amount.toFixed(2)} spent
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    ${category.total_spent?.toFixed(2) || "0.00"}
+                    {category.amount_type === 'fixed' && (
+                      <>/${category.amount.toFixed(2)}</>
+                    )}
+                    {' '}
+                    {category.type === 'spending' ? 'spent' : 'earned'}
+                  </span>
+                  <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                    {category.amount_type === 'fixed' ? 'Fixed' : 'Flexible'}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -143,14 +153,15 @@ export function CategoryItem({
                 </button>
               </div>
             </div>
-            <div className="mt-2">
-              <ProgressBar
-                spentPercentage={spentPercentage}
-                timeProgress={timeProgress}
-              />
-            </div>
+            {category.amount_type === 'fixed' && (
+              <div className="mt-2">
+                <ProgressBar
+                  spentPercentage={spentPercentage}
+                  timeProgress={timeProgress}
+                />
+              </div>
+            )}
 
-            {/* Transactions List */}
             {isExpanded && (
               <div className="mt-4 space-y-2">
                 {transactions.length === 0 ? (
