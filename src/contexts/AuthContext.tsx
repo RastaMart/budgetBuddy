@@ -34,12 +34,14 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  console.log("AuthProvider initialized");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log("AuthProvider useEffect triggered");
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .insert([
             {
               id: user.id,
+              user_id: user.id,
               email: user.email,
               name: user.user_metadata.full_name || user.email,
               avatar_url: user.user_metadata.avatar_url,
@@ -139,7 +142,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (signUpError) throw signUpError;
       if (!data.user) throw new Error("User creation failed");
-
     } catch (error: any) {
       console.error("Signup error:", error);
       throw new Error(error.message || "Failed to create account");
