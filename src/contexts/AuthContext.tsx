@@ -34,14 +34,12 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  console.log("AuthProvider initialized");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log("AuthProvider useEffect triggered");
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -60,14 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function createOrFetchProfile(user: User) {
     try {
-      console.log("Creating or fetching profile for user:", user);
       // First try to fetch existing profile
       const { data: existingProfile } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
-      console.log("Existing profile data:", existingProfile);
+
       if (existingProfile) {
         setProfile(existingProfile);
       } else {
@@ -112,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
 
-      navigate("/", { replace: true });
+      navigate("/");
     } catch (error: any) {
       console.error("Sign in error:", error);
       throw error;

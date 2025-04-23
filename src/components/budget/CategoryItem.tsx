@@ -57,30 +57,33 @@ export function CategoryItem({
   const timeProgress = getTimeProgress(category.timeframe);
 
   useEffect(() => {
-    if (isExpanded) {
+    if (isExpanded || showTransactionModal) {
       fetchTransactions();
-      if (category.type === 'shared_income') {
+      if (category.type === "shared_income") {
         calculateAllocationStats();
       }
     }
-  }, [isExpanded]);
+  }, [category.type, isExpanded, showTransactionModal]);
 
   async function fetchTransactions() {
     try {
       const { data, error } = await supabase
         .from("transactions")
-        .select(`
+        .select(
+          `
           id,
           amount,
           description,
           date,
           assigned_date,
           allocation_id
-        `)
+        `
+        )
         .eq("category_id", category.id)
         .order("date", { ascending: false });
 
       if (error) throw error;
+      console.log("Fetched transactions:", data);
       setTransactions(data || []);
     } catch (error) {
       console.error("Error fetching transactions:", error);
@@ -88,62 +91,75 @@ export function CategoryItem({
   }
 
   async function calculateAllocationStats() {
+    console.log("Calculating allocation stats...");
     try {
       // Fetch allocations
       const { data: allocations, error: allocationsError } = await supabase
         .from("category_allocations")
-        .select(`
+        .select(
+          `
           id,
           allocation_type,
           percentage,
           reference_category_id
-        `)
+        `
+        )
         .eq("category_id", category.id);
 
       if (allocationsError) throw allocationsError;
+      console.log("Fetched allocations:", allocations);
 
       // Calculate stats for each allocation
-      const stats = await Promise.all((allocations || []).map(async (allocation) => {
-        let percentage = allocation.percentage || 0;
-        let name = "";
+      const stats = await Promise.all(
+        (allocations || []).map(async (allocation) => {
+          let percentage = allocation.percentage || 0;
+          let name = "";
 
-        if (allocation.allocation_type === 'dynamic' && allocation.reference_category_id) {
-          // Fetch reference category details
-          const { data: refCategory } = await supabase
-            .from("categories")
-            .select("name, total_spent")
-            .eq("id", allocation.reference_category_id)
-            .single();
+          if (
+            allocation.allocation_type === "dynamic" &&
+            allocation.reference_category_id
+          ) {
+            // Fetch reference category details
+            const { data: refCategory } = await supabase
+              .from("categories")
+              .select("name, total_spent")
+              .eq("id", allocation.reference_category_id)
+              .single();
 
-          if (refCategory) {
-            name = `Based on ${refCategory.name}`;
-            const totalIncome = category.total_spent || 0;
-            percentage = totalIncome > 0 ? ((refCategory.total_spent || 0) / totalIncome) * 100 : 0;
+            if (refCategory) {
+              name = `Based on ${refCategory.name}`;
+              const totalIncome = category.total_spent || 0;
+              percentage =
+                totalIncome > 0
+                  ? ((refCategory.total_spent || 0) / totalIncome) * 100
+                  : 0;
+            }
+          } else {
+            name = `Manual Allocation (${allocation.percentage}%)`;
           }
-        } else {
-          name = `Manual Allocation (${allocation.percentage}%)`;
-        }
 
-        // Calculate total spent for this allocation
-        const { data: allocationTransactions } = await supabase
-          .from("transactions")
-          .select("amount")
-          .eq("category_id", category.id)
-          .eq("allocation_id", allocation.id);
+          // Calculate total spent for this allocation
+          const { data: allocationTransactions } = await supabase
+            .from("transactions")
+            .select("amount")
+            .eq("category_id", category.id)
+            .eq("allocation_id", allocation.id);
 
-        const total_spent = (allocationTransactions || []).reduce(
-          (sum, t) => sum + (t.amount || 0),
-          0
-        );
+          const total_spent = (allocationTransactions || []).reduce(
+            (sum, t) => sum + (t.amount || 0),
+            0
+          );
 
-        return {
-          id: allocation.id,
-          name,
-          percentage,
-          amount: (category.amount * percentage) / 100,
-          total_spent
-        };
-      }));
+          return {
+            id: allocation.id,
+            name,
+            percentage,
+            amount: (category.amount * percentage) / 100,
+            total_spent,
+          };
+        })
+      );
+      console.log("Calculated allocation stats:", stats);
 
       setAllocationStats(stats);
     } catch (error) {
@@ -158,7 +174,8 @@ export function CategoryItem({
       const { error } = await supabase.from("transactions").insert({
         user_id: user.id,
         category_id: category.id,
-        allocation_id: category.type === 'shared_income' ? selectedAllocation : null,
+        allocation_id:
+          category.type === "shared_income" ? selectedAllocation : null,
         amount: parseFloat(formData.amount),
         description: formData.description,
         date: formData.date,
@@ -179,7 +196,7 @@ export function CategoryItem({
       onTransactionAdded();
       if (isExpanded) {
         fetchTransactions();
-        if (category.type === 'shared_income') {
+        if (category.type === "shared_income") {
           calculateAllocationStats();
         }
       }
@@ -211,18 +228,21 @@ export function CategoryItem({
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">
                     ${category.total_spent?.toFixed(2) || "0.00"}
-                    {category.amount_type === 'fixed' && (
+                    {category.amount_type === "fixed" && (
                       <>/${category.amount.toFixed(2)}</>
-                    )}
-                    {' '}
-                    {category.type === 'spending' ? 'spent' : 'earned'}
+                    )}{" "}
+                    {category.type === "spending" ? "spent" : "earned"}
                   </span>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    category.type === 'shared_income' 
-                      ? 'bg-purple-100 text-purple-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {category.type === 'shared_income' ? 'Shared Income' : category.type}
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      category.type === "shared_income"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {category.type === "shared_income"
+                      ? "Shared Income"
+                      : category.type}
                   </span>
                 </div>
               </div>
@@ -242,7 +262,7 @@ export function CategoryItem({
               </div>
             </div>
 
-            {category.amount_type === 'fixed' && (
+            {category.amount_type === "fixed" && (
               <div className="mt-2">
                 <ProgressBar
                   spentPercentage={spentPercentage}
@@ -252,22 +272,33 @@ export function CategoryItem({
             )}
 
             {/* Allocations */}
-            {category.type === 'shared_income' && isExpanded && (
+            {category.type === "shared_income" && isExpanded && (
               <div className="mt-4 space-y-4">
-                <h4 className="text-sm font-medium text-gray-700">Allocations</h4>
+                <h4 className="text-sm font-medium text-gray-700">
+                  Allocations
+                </h4>
                 <div className="space-y-2">
                   {allocationStats.map((allocation) => (
-                    <div key={allocation.id} className="bg-gray-50 p-3 rounded-lg">
+                    <div
+                      key={allocation.id}
+                      className="bg-gray-50 p-3 rounded-lg"
+                    >
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">{allocation.name}</span>
+                        <span className="text-sm font-medium">
+                          {allocation.name}
+                        </span>
                         <span className="text-sm text-gray-500">
-                          {allocation.percentage.toFixed(1)}% • ${allocation.total_spent.toFixed(2)}
-                          {category.amount_type === 'fixed' && ` / $${allocation.amount.toFixed(2)}`}
+                          {allocation.percentage.toFixed(1)}% • $
+                          {allocation.total_spent.toFixed(2)}
+                          {category.amount_type === "fixed" &&
+                            ` / $${allocation.amount.toFixed(2)}`}
                         </span>
                       </div>
-                      {category.amount_type === 'fixed' && (
+                      {category.amount_type === "fixed" && (
                         <ProgressBar
-                          spentPercentage={(allocation.total_spent / allocation.amount) * 100}
+                          spentPercentage={
+                            (allocation.total_spent / allocation.amount) * 100
+                          }
                           timeProgress={timeProgress}
                         />
                       )}
@@ -293,7 +324,9 @@ export function CategoryItem({
                       assignedDate={transaction.assigned_date}
                       allocationId={transaction.allocation_id}
                       allocationName={
-                        allocationStats.find(a => a.id === transaction.allocation_id)?.name
+                        allocationStats.find(
+                          (a) => a.id === transaction.allocation_id
+                        )?.name
                       }
                     />
                   ))
@@ -310,7 +343,7 @@ export function CategoryItem({
         title="Add Transaction"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {category.type === 'shared_income' && (
+          {category.type === "shared_income" && (
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Allocation
@@ -339,7 +372,9 @@ export function CategoryItem({
               type="number"
               step="0.01"
               value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, amount: e.target.value })
+              }
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               required
             />
@@ -352,7 +387,9 @@ export function CategoryItem({
             <input
               type="text"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               required
             />
@@ -365,7 +402,9 @@ export function CategoryItem({
             <input
               type="date"
               value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, date: e.target.value })
+              }
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               required
             />

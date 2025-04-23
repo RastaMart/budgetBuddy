@@ -31,7 +31,9 @@ export function Budgets() {
   const [showNewBudgetForm, setShowNewBudgetForm] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>({});
+  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>(
+    {}
+  );
   const [formData, setFormData] = useState({
     name: "",
     amount: "",
@@ -61,7 +63,9 @@ export function Budgets() {
         setSelectedBudget(data[0].id);
       }
 
-      await Promise.all(data?.map((budget) => fetchBudgetUsersData(budget.id)) || []);
+      await Promise.all(
+        data?.map((budget) => fetchBudgetUsersData(budget.id)) || []
+      );
     } catch (error) {
       console.error("Error fetching budgets:", error);
     } finally {
@@ -183,7 +187,9 @@ export function Budgets() {
     );
   }
 
-  const selectedBudgetUsers = selectedBudget ? budgetUsers[selectedBudget] || [] : [];
+  const selectedBudgetUsers = selectedBudget
+    ? budgetUsers[selectedBudget] || []
+    : [];
   const currentBudget = budgets.find((b) => b.id === selectedBudget);
 
   return (
