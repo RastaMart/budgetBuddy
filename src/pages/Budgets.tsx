@@ -31,13 +31,13 @@ export function Budgets() {
   const [showNewBudgetForm, setShowNewBudgetForm] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>(
-    {}
-  );
+  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>({});
   const [formData, setFormData] = useState({
     name: "",
     amount: "",
-    timeframe: "monthly" as "weekly" | "monthly" | "yearly",
+    timeframe: "monthly" as "weekly" | "biweekly" | "monthly" | "yearly",
+    type: "spending" as "spending" | "income",
+    amount_type: "fixed" as "fixed" | "flexible",
   });
 
   useEffect(() => {
@@ -57,15 +57,11 @@ export function Budgets() {
       const data = await fetchUserBudgets(user.id);
       setBudgets(data);
 
-      // Select first budget by default
       if (data.length > 0 && !selectedBudget) {
         setSelectedBudget(data[0].id);
       }
 
-      // Fetch users for all budgets
-      await Promise.all(
-        data?.map((budget) => fetchBudgetUsersData(budget.id)) || []
-      );
+      await Promise.all(data?.map((budget) => fetchBudgetUsersData(budget.id)) || []);
     } catch (error) {
       console.error("Error fetching budgets:", error);
     } finally {
@@ -103,7 +99,6 @@ export function Budgets() {
       const data = await fetchUserBudgets(user.id);
       setBudgets(data);
 
-      // Select the newly created budget
       if (data.length > 0) {
         setSelectedBudget(data[data.length - 1].id);
       }
@@ -125,13 +120,17 @@ export function Budgets() {
         user.id,
         formData.name,
         parseFloat(formData.amount),
-        formData.timeframe
+        formData.timeframe,
+        formData.type,
+        formData.amount_type
       );
 
       setFormData({
         name: "",
         amount: "",
         timeframe: "monthly",
+        type: "spending",
+        amount_type: "fixed",
       });
       setShowForm(false);
       fetchCategoriesData();
@@ -166,7 +165,6 @@ export function Budgets() {
 
     try {
       await deleteBudget(selectedBudget);
-
       setBudgets((prev) => prev.filter((b) => b.id !== selectedBudget));
       setSelectedBudget(budgets[0]?.id || null);
       setShowDeleteModal(false);
@@ -185,14 +183,11 @@ export function Budgets() {
     );
   }
 
-  const selectedBudgetUsers = selectedBudget
-    ? budgetUsers[selectedBudget] || []
-    : [];
+  const selectedBudgetUsers = selectedBudget ? budgetUsers[selectedBudget] || [] : [];
   const currentBudget = budgets.find((b) => b.id === selectedBudget);
 
   return (
     <div className="space-y-6">
-      {/* Budget Tabs */}
       <BudgetTabs
         budgets={budgets}
         selectedBudget={selectedBudget}
@@ -201,7 +196,6 @@ export function Budgets() {
         onNewBudget={() => setShowNewBudgetForm(true)}
       />
 
-      {/* Budget Actions */}
       {selectedBudget && (
         <BudgetHeader
           users={selectedBudgetUsers}
@@ -210,7 +204,6 @@ export function Budgets() {
         />
       )}
 
-      {/* New Budget Form */}
       {showNewBudgetForm && (
         <NewBudgetForm
           onSubmit={handleCreateBudget}
@@ -218,7 +211,6 @@ export function Budgets() {
         />
       )}
 
-      {/* Categories Section */}
       {selectedBudget && (
         <>
           <div className="flex justify-between items-center">
@@ -263,6 +255,12 @@ export function Budgets() {
               />
               <CategorySection
                 categories={categories}
+                timeframe="biweekly"
+                onDelete={handleDeleteCategorySubmit}
+                onTransactionAdded={fetchCategoriesData}
+              />
+              <CategorySection
+                categories={categories}
                 timeframe="monthly"
                 onDelete={handleDeleteCategorySubmit}
                 onTransactionAdded={fetchCategoriesData}
@@ -278,7 +276,6 @@ export function Budgets() {
         </>
       )}
 
-      {/* Modals */}
       <ShareBudgetModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}

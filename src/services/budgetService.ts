@@ -37,9 +37,7 @@ export async function deleteBudget(budgetId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function fetchBudgetUsers(
-  budgetId: string
-): Promise<BudgetUser[]> {
+export async function fetchBudgetUsers(budgetId: string): Promise<BudgetUser[]> {
   const { data, error } = await supabase
     .from("budget_users")
     .select(
@@ -84,7 +82,6 @@ export async function shareBudgetWithUser(
   budgetId: string,
   email: string
 ): Promise<void> {
-  // Find the user by email
   const { data: userData, error: userError } = await supabase
     .from("profiles")
     .select("id")
@@ -94,7 +91,6 @@ export async function shareBudgetWithUser(
   if (userError) throw userError;
   if (!userData) throw new Error("User not found");
 
-  // Add them to budget_users
   const { error: shareError } = await supabase.from("budget_users").insert({
     budget_id: budgetId,
     user_id: userData.id,
@@ -112,14 +108,13 @@ export async function fetchCategories(budgetId: string): Promise<Category[]> {
     .order("created_at", { ascending: false });
 
   if (categoriesError) throw categoriesError;
-
+  
   const categoriesWithSpending = await Promise.all(
     (categoriesData || []).map(async (category) => {
-      const { data: transactionsData, error: transactionsError } =
-        await supabase
-          .from("transactions")
-          .select("amount")
-          .eq("category_id", category.id);
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from("transactions")
+        .select("amount")
+        .eq("category_id", category.id);
 
       if (transactionsError) throw transactionsError;
 
@@ -143,14 +138,18 @@ export async function createCategory(
   userId: string,
   name: string,
   amount: number,
-  timeframe: "weekly" | "monthly" | "yearly"
+  timeframe: "weekly" | "biweekly" | "monthly" | "yearly",
+  type: "spending" | "income",
+  amount_type: "fixed" | "flexible"
 ): Promise<void> {
   const { error } = await supabase.from("categories").insert({
     budget_id: budgetId,
     user_id: userId,
     name,
-    amount,
+    amount: amount_type === 'fixed' ? amount : 0,
     timeframe,
+    type,
+    amount_type,
   });
 
   if (error) throw error;

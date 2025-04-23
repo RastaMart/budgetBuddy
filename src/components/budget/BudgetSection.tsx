@@ -15,6 +15,7 @@ export function BudgetSection({ budgets, timeframe, onDelete, onTransactionAdded
 
   const timeframeLabels = {
     weekly: 'Weekly Budgets',
+    biweekly: 'Bi-Weekly Budgets',
     monthly: 'Monthly Budgets',
     yearly: 'Yearly Budgets'
   };

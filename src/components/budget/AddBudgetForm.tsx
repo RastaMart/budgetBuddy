@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 interface FormData {
   name: string;
   amount: string;
-  timeframe: 'weekly' | 'monthly' | 'yearly';
+  timeframe: 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 }
 
 interface AddBudgetFormProps {
@@ -60,6 +60,7 @@ export function AddBudgetForm({ formData, onSubmit, onChange }: AddBudgetFormPro
               required
             >
               <option value="weekly">Weekly</option>
+              <option value="biWeekly">Biweekly</option>
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
             </select>
