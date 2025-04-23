@@ -11,6 +11,8 @@ interface TransactionItemProps {
   date: string;
   assignedDate: string;
   categoryName?: string;
+  allocationId?: string;
+  allocationName?: string;
   onDelete?: (id: string) => void;
   onAssignedDateChange?: () => void;
 }
@@ -21,7 +23,9 @@ export function TransactionItem({
   amount, 
   date,
   assignedDate,
-  categoryName, 
+  categoryName,
+  allocationId,
+  allocationName,
   onDelete,
   onAssignedDateChange
 }: TransactionItemProps) {
@@ -45,7 +49,7 @@ export function TransactionItem({
       }
     } catch (error) {
       console.error('Error updating assigned date:', error);
-      setNewAssignedDate(assignedDate); // Revert on error
+      setNewAssignedDate(assignedDate);
     } finally {
       setIsEditing(false);
     }
@@ -86,6 +90,11 @@ export function TransactionItem({
           {categoryName && (
             <span className="text-gray-500 ml-2">
               • {categoryName}
+            </span>
+          )}
+          {allocationName && (
+            <span className="text-purple-600 ml-2">
+              • {allocationName}
             </span>
           )}
         </div>

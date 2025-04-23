@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { Budget, Category } from "../types/budget";
+import { Budget, Category, CategoryAllocation } from "../types/budget";
 
 export interface BudgetUser {
   user_id: string;
@@ -123,9 +123,22 @@ export async function fetchCategories(budgetId: string): Promise<Category[]> {
         0
       );
 
+      // Fetch allocations for shared income categories
+      let allocations: CategoryAllocation[] = [];
+      if (category.type === 'shared_income') {
+        const { data: allocationsData, error: allocationsError } = await supabase
+          .from("category_allocations")
+          .select("*")
+          .eq("category_id", category.id);
+
+        if (allocationsError) throw allocationsError;
+        allocations = allocationsData || [];
+      }
+
       return {
         ...category,
         total_spent: totalSpent,
+        allocations,
       };
     })
   );
@@ -139,20 +152,42 @@ export async function createCategory(
   name: string,
   amount: number,
   timeframe: "weekly" | "biweekly" | "monthly" | "yearly",
-  type: "spending" | "income",
-  amount_type: "fixed" | "flexible"
+  type: "spending" | "income" | "shared_income",
+  amount_type: "fixed" | "flexible",
+  allocations?: {
+    allocation_type: 'manual' | 'dynamic';
+    percentage?: number;
+    reference_category_id?: string;
+  }[]
 ): Promise<void> {
-  const { error } = await supabase.from("categories").insert({
-    budget_id: budgetId,
-    user_id: userId,
-    name,
-    amount: amount_type === 'fixed' ? amount : 0,
-    timeframe,
-    type,
-    amount_type,
-  });
+  const { data: category, error: categoryError } = await supabase
+    .from("categories")
+    .insert({
+      budget_id: budgetId,
+      user_id: userId,
+      name,
+      amount: amount_type === 'fixed' ? amount : 0,
+      timeframe,
+      type,
+      amount_type,
+    })
+    .select()
+    .single();
 
-  if (error) throw error;
+  if (categoryError) throw categoryError;
+
+  if (type === 'shared_income' && allocations?.length) {
+    const { error: allocationsError } = await supabase
+      .from("category_allocations")
+      .insert(
+        allocations.map(allocation => ({
+          category_id: category.id,
+          ...allocation
+        }))
+      );
+
+    if (allocationsError) throw allocationsError;
+  }
 }
 
 export async function deleteCategory(categoryId: string): Promise<void> {
