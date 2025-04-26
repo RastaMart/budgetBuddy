@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useContext";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Budget, Category } from "../types/budget";
-import { CategorySection } from "../components/budget/CategorySection";
+import { CategoryItem } from "../components/budget/CategoryItem";
 import { AddCategoryForm } from "../components/budget/AddCategoryForm";
 import { BudgetTabs } from "../components/budget/BudgetTabs";
 import { BudgetHeader } from "../components/budget/BudgetHeader";
 import { NewBudgetForm } from "../components/budget/NewBudgetForm";
 import { ShareBudgetModal } from "../components/budget/ShareBudgetModal";
 import { DeleteBudgetModal } from "../components/budget/DeleteBudgetModal";
+import { Modal } from "../components/shared/Modal";
 import {
   BudgetUser,
   fetchUserBudgets,
@@ -27,19 +28,19 @@ export function Budgets() {
   const [selectedBudget, setSelectedBudget] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [showNewBudgetForm, setShowNewBudgetForm] = useState(false);
+  const [showNewBudgetModal, setShowNewBudgetModal] = useState(false);
+  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>(
-    {}
-  );
+  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>({});
   const [formData, setFormData] = useState({
     name: "",
     amount: "",
     timeframe: "monthly" as "weekly" | "biweekly" | "monthly" | "yearly",
-    type: "spending" as "spending" | "income",
+    type: "spending" as "spending" | "income" | "shared_income",
     amount_type: "fixed" as "fixed" | "flexible",
+    allocations: [],
+    allocation_type: "manual" as "manual" | "dynamic"
   });
 
   useEffect(() => {
@@ -53,6 +54,20 @@ export function Budgets() {
     }
   }, [selectedBudget]);
 
+  const timeframes = ["weekly", "biweekly", "monthly", "yearly"] as const;
+  const timeframeLabels = {
+    weekly: "Weekly",
+    biweekly: "Bi-Weekly",
+    monthly: "Monthly",
+    yearly: "Yearly",
+  };
+
+  // Separate income and spending categories
+  const incomeCategories = categories.filter(
+    (cat) => cat.type === "income" || cat.type === "shared_income"
+  );
+  const spendingCategories = categories.filter((cat) => cat.type === "spending");
+
   async function fetchUserBudgetsData() {
     try {
       setIsLoading(true);
@@ -63,9 +78,7 @@ export function Budgets() {
         setSelectedBudget(data[0].id);
       }
 
-      await Promise.all(
-        data?.map((budget) => fetchBudgetUsersData(budget.id)) || []
-      );
+      await Promise.all(data?.map((budget) => fetchBudgetUsersData(budget.id)) || []);
     } catch (error) {
       console.error("Error fetching budgets:", error);
     } finally {
@@ -106,7 +119,7 @@ export function Budgets() {
       if (data.length > 0) {
         setSelectedBudget(data[data.length - 1].id);
       }
-      setShowNewBudgetForm(false);
+      setShowNewBudgetModal(false);
     } catch (error) {
       console.error("Error creating budget:", error);
     } finally {
@@ -126,7 +139,8 @@ export function Budgets() {
         parseFloat(formData.amount),
         formData.timeframe,
         formData.type,
-        formData.amount_type
+        formData.amount_type,
+        formData.type === 'shared_income' ? formData.allocations : undefined
       );
 
       setFormData({
@@ -135,8 +149,10 @@ export function Budgets() {
         timeframe: "monthly",
         type: "spending",
         amount_type: "fixed",
+        allocations: [],
+        allocation_type: "manual"
       });
-      setShowForm(false);
+      setShowNewCategoryModal(false);
       fetchCategoriesData();
     } catch (error) {
       console.error("Error adding category:", error);
@@ -187,9 +203,7 @@ export function Budgets() {
     );
   }
 
-  const selectedBudgetUsers = selectedBudget
-    ? budgetUsers[selectedBudget] || []
-    : [];
+  const selectedBudgetUsers = selectedBudget ? budgetUsers[selectedBudget] || [] : [];
   const currentBudget = budgets.find((b) => b.id === selectedBudget);
 
   return (
@@ -199,7 +213,7 @@ export function Budgets() {
         selectedBudget={selectedBudget}
         budgetUsers={budgetUsers}
         onSelectBudget={setSelectedBudget}
-        onNewBudget={() => setShowNewBudgetForm(true)}
+        onNewBudget={() => setShowNewBudgetModal(true)}
       />
 
       {selectedBudget && (
@@ -210,42 +224,18 @@ export function Budgets() {
         />
       )}
 
-      {showNewBudgetForm && (
-        <NewBudgetForm
-          onSubmit={handleCreateBudget}
-          onCancel={() => setShowNewBudgetForm(false)}
-        />
-      )}
-
       {selectedBudget && (
         <>
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-medium text-gray-900">Categories</h2>
             <button
-              onClick={() => setShowForm(!showForm)}
+              onClick={() => setShowNewCategoryModal(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {showForm ? (
-                <>
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Category
-                </>
-              )}
+              <Plus className="w-4 h-4 mr-2" />
+              Add Category
             </button>
           </div>
-
-          {showForm && (
-            <AddCategoryForm
-              formData={formData}
-              onSubmit={handleCreateCategorySubmit}
-              onChange={(data) => setFormData({ ...formData, ...data })}
-            />
-          )}
 
           {categories.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
@@ -253,34 +243,110 @@ export function Budgets() {
             </div>
           ) : (
             <div className="space-y-6">
-              <CategorySection
-                categories={categories}
-                timeframe="weekly"
-                onDelete={handleDeleteCategorySubmit}
-                onTransactionAdded={fetchCategoriesData}
-              />
-              <CategorySection
-                categories={categories}
-                timeframe="biweekly"
-                onDelete={handleDeleteCategorySubmit}
-                onTransactionAdded={fetchCategoriesData}
-              />
-              <CategorySection
-                categories={categories}
-                timeframe="monthly"
-                onDelete={handleDeleteCategorySubmit}
-                onTransactionAdded={fetchCategoriesData}
-              />
-              <CategorySection
-                categories={categories}
-                timeframe="yearly"
-                onDelete={handleDeleteCategorySubmit}
-                onTransactionAdded={fetchCategoriesData}
-              />
+              {/* Income Categories Section */}
+              {incomeCategories.length > 0 && (
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="bg-green-50 px-6 py-3 border-b border-green-100">
+                    <h2 className="text-xl font-medium text-green-800">Income Categories</h2>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {timeframes.map((timeframe) => {
+                      const timeframeCategories = incomeCategories.filter(
+                        (cat) => cat.timeframe === timeframe
+                      );
+                      if (timeframeCategories.length === 0) return null;
+
+                      return (
+                        <div key={timeframe}>
+                          <div className="px-6 py-2 bg-green-50">
+                            <h3 className="text-sm font-medium text-green-700">
+                              {timeframeLabels[timeframe]}
+                            </h3>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {timeframeCategories.map((category) => (
+                              <CategoryItem
+                                key={category.id}
+                                category={category}
+                                timeframe={timeframe}
+                                onDelete={handleDeleteCategorySubmit}
+                                onTransactionAdded={fetchCategoriesData}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Spending Categories Section */}
+              {spendingCategories.length > 0 && (
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                    <h2 className="text-xl font-medium text-gray-900">Spending Categories</h2>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {timeframes.map((timeframe) => {
+                      const timeframeCategories = spendingCategories.filter(
+                        (cat) => cat.timeframe === timeframe
+                      );
+                      if (timeframeCategories.length === 0) return null;
+
+                      return (
+                        <div key={timeframe}>
+                          <div className="px-6 py-2 bg-gray-50">
+                            <h3 className="text-sm font-medium text-gray-700">
+                              {timeframeLabels[timeframe]}
+                            </h3>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {timeframeCategories.map((category) => (
+                              <CategoryItem
+                                key={category.id}
+                                category={category}
+                                timeframe={timeframe}
+                                onDelete={handleDeleteCategorySubmit}
+                                onTransactionAdded={fetchCategoriesData}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
       )}
+
+      {/* Modals */}
+      <Modal
+        isOpen={showNewBudgetModal}
+        onClose={() => setShowNewBudgetModal(false)}
+        title="Create New Budget"
+      >
+        <NewBudgetForm
+          onSubmit={handleCreateBudget}
+          onCancel={() => setShowNewBudgetModal(false)}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={showNewCategoryModal}
+        onClose={() => setShowNewCategoryModal(false)}
+        title="Add Category"
+        size="large"
+      >
+        <AddCategoryForm
+          formData={formData}
+          onSubmit={handleCreateCategorySubmit}
+          onChange={(data) => setFormData({ ...formData, ...data })}
+        />
+      </Modal>
 
       <ShareBudgetModal
         isOpen={showShareModal}

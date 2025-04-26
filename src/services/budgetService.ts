@@ -155,11 +155,26 @@ export async function createCategory(
   type: "spending" | "income" | "shared_income",
   amount_type: "fixed" | "flexible",
   allocations?: {
-    allocation_type: 'manual' | 'dynamic';
-    percentage?: number;
-    reference_category_id?: string;
+    name: string;
+    percentage: number;
+    isManual: boolean;
+    referenceCategory?: {
+      id: string;
+      budget_id: string;
+    };
   }[]
 ): Promise<void> {
+  // First, create the category
+  console.log('', {
+    budgetId,
+  userId,
+  name,
+  amount,
+  timeframe,
+  type,
+  amount_type,
+  allocations
+  });
   const { data: category, error: categoryError } = await supabase
     .from("categories")
     .insert({
@@ -174,17 +189,21 @@ export async function createCategory(
     .select()
     .single();
 
+console.log('allocations', allocations);
+  
   if (categoryError) throw categoryError;
-
-  if (type === 'shared_income' && allocations?.length) {
+  // If this is a shared income category and we have allocations, create them
+  if (type === 'shared_income' && allocations?.length && category) {
+    const allocationRecords = allocations.map(allocation => ({
+      category_id: category.id,
+      allocation_type: allocation.isManual ? 'manual' : 'dynamic',
+      percentage: allocation.isManual ? allocation.percentage : null,
+      reference_category_id: allocation.isManual ? null : allocation.referenceCategory?.id
+    }));
+console.log('allocationRecords', allocationRecords);
     const { error: allocationsError } = await supabase
       .from("category_allocations")
-      .insert(
-        allocations.map(allocation => ({
-          category_id: category.id,
-          ...allocation
-        }))
-      );
+      .insert(allocationRecords);
 
     if (allocationsError) throw allocationsError;
   }

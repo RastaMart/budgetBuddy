@@ -29,7 +29,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'default' }: Mo
   if (!isOpen) return null;
 
   const sizeClasses = {
-    default: 'sm:max-w-lg',
+    default: 'sm:max-w-xl',
     large: 'sm:max-w-4xl',
     full: 'sm:max-w-7xl',
   };

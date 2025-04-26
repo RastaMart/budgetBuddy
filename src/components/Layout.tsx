@@ -12,7 +12,7 @@ export function Layout() {
       {/* Sidebar */}
       <nav className="w-64 bg-white border-r border-gray-200">
         <div className="h-16 flex items-center px-6">
-          <h1 className="text-xl font-semibold text-gray-900">CouplesBudget</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Budget Buddy</h1>
         </div>
         <div className="px-3 py-4 flex flex-col h-[calc(100vh-4rem)] justify-between">
           <div className="space-y-1">

@@ -3,7 +3,6 @@ import { Plus } from "lucide-react";
 import { CSVImport } from "./CSVImport";
 import { Modal } from "../shared/Modal";
 import { useAuth } from "../../hooks/useContext";
-import { toZonedTime } from "date-fns-tz";
 import { supabase } from "../../lib/supabase";
 
 interface FormData {
@@ -14,25 +13,14 @@ interface FormData {
   date: string;
 }
 
-interface CSVTransaction {
-  date: string;
-  description: string;
-  amount: string;
-  category?: string;
-}
-
-interface CategoryAllocation {
-  id: string;
-  allocation_type: 'manual' | 'dynamic';
-  percentage: number;
-  reference_category_id?: string;
-  name?: string;
-}
-
 interface Category {
   id: string;
   name: string;
   type: 'spending' | 'income' | 'shared_income';
+  budget: {
+    id: string;
+    name: string;
+  };
 }
 
 interface AddTransactionFormProps {
@@ -41,7 +29,7 @@ interface AddTransactionFormProps {
   onChange: (data: Partial<FormData>) => void;
   categories: Category[];
   selectedCategoryId?: string;
-  onBulkImport?: (transactions: CSVTransaction[]) => void;
+  onBulkImport?: (transactions: any[]) => void;
   onClose?: () => void;
 }
 
@@ -56,86 +44,20 @@ export function AddTransactionForm({
 }: AddTransactionFormProps) {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<"manual" | "bulk">("manual");
-  const [importedTransactions, setImportedTransactions] = useState<CSVTransaction[]>([]);
-  const [allocations, setAllocations] = useState<CategoryAllocation[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [groupedCategories, setGroupedCategories] = useState<{[key: string]: Category[]}>({});
 
   useEffect(() => {
-    if (selectedCategoryId || formData.category_id) {
-      const categoryId = selectedCategoryId || formData.category_id;
-      const category = categories.find(c => c.id === categoryId);
-      setSelectedCategory(category || null);
-      if (category?.type === 'shared_income') {
-        fetchAllocations(categoryId);
+    // Group categories by budget
+    const grouped = categories.reduce((acc: {[key: string]: Category[]}, category) => {
+      const budgetName = category.budget?.name || 'Uncategorized';
+      if (!acc[budgetName]) {
+        acc[budgetName] = [];
       }
-    }
-  }, [selectedCategoryId, formData.category_id]);
-
-  const handleTransactionsLoaded = (transactions: CSVTransaction[]) => {
-    setImportedTransactions(transactions);
-    if (onBulkImport) {
-      onBulkImport(transactions);
-    }
-  };
-
-  const handleCategoryChange = async (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
-    setSelectedCategory(category || null);
-    onChange({ category_id: categoryId, allocation_id: undefined });
-    
-    if (category?.type === 'shared_income') {
-      await fetchAllocations(categoryId);
-    } else {
-      setAllocations([]);
-    }
-  };
-
-  const fetchAllocations = async (categoryId: string) => {
-    console.log('fetchAllocations', categoryId);
-    try {
-      const { data, error } = await supabase
-        .from('category_allocations')
-        .select(`
-          id,
-          allocation_type,
-          percentage,
-          reference_category_id
-        `)
-        .eq('category_id', categoryId);
-
-      if (error) throw error;
-
-      // For each allocation, get the reference category name if it exists
-      const allocationsWithNames = await Promise.all((data || []).map(async (allocation) => {
-        let name = '';
-        if (allocation.allocation_type === 'dynamic' && allocation.reference_category_id) {
-          const { data: refCategory } = await supabase
-            .from('categories')
-            .select('name')
-            .eq('id', allocation.reference_category_id)
-            .single();
-          
-          if (refCategory) {
-            name = `Based on ${refCategory.name}`;
-          }
-        } else {
-          name = `Manual Allocation (${allocation.percentage}%)`;
-        }
-
-        return {
-          ...allocation,
-          name
-        };
-      }));
-
-      setAllocations(allocationsWithNames);
-    } catch (error) {
-      console.error('Error fetching allocations:', error);
-    }
-  };
-
-  // Get today's date in user's timezone
-  const today = toZonedTime(new Date().toISOString(), profile?.timezone || 'UTC');
+      acc[budgetName].push(category);
+      return acc;
+    }, {});
+    setGroupedCategories(grouped);
+  }, [categories]);
 
   return (
     <div>
@@ -179,38 +101,17 @@ export function AddTransactionForm({
                   id="category"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   value={formData.category_id}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  onChange={(e) => onChange({ category_id: e.target.value })}
                 >
                   <option value="">Select a category</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {selectedCategory?.type === 'shared_income' && (
-              <div>
-                <label
-                  htmlFor="allocation"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Allocation
-                </label>
-                <select
-                  id="allocation"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  value={formData.allocation_id}
-                  onChange={(e) => onChange({ allocation_id: e.target.value })}
-                  required
-                >
-                  <option value="">Select an allocation</option>
-                  {allocations.map((allocation) => (
-                    <option key={allocation.id} value={allocation.id}>
-                      {allocation.name}
-                    </option>
+                  {Object.entries(groupedCategories).map(([budgetName, cats]) => (
+                    <optgroup key={budgetName} label={budgetName}>
+                      {cats.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -262,7 +163,7 @@ export function AddTransactionForm({
                 type="date"
                 id="date"
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={formData.date || today}
+                value={formData.date}
                 onChange={(e) => onChange({ date: e.target.value })}
                 required
               />
@@ -285,7 +186,7 @@ export function AddTransactionForm({
       {activeTab === "bulk" && (
         <div className="space-y-6">
           <CSVImport
-            onTransactionsLoaded={handleTransactionsLoaded}
+            onTransactionsLoaded={onBulkImport || (() => {})}
             categories={categories}
             onClose={onClose}
           />
