@@ -1,3 +1,5 @@
+import { Budget } from './budget';
+
 export interface Category {
   id: string;
   name: string;
@@ -6,6 +8,15 @@ export interface Category {
   type: 'spending' | 'income' | 'shared_income';
   amount_type: 'fixed' | 'flexible';
   total_spent?: number;
+  allocations: SharedIncomeAllocation[];
+  allocation_type: 'manual' | 'dynamic';
+
+  budget?: Budget;
+  budget_id: string;
+}
+export interface RefCategory {
+  id: string;
+  budget_id: string;
 }
 
 export interface CategoryAllocation {
@@ -20,5 +31,6 @@ export interface SharedIncomeAllocation {
   name: string;
   percentage: number;
   isManual: boolean;
-  referenceCategory?: Category;
+  referenceCategory?: RefCategory;
+  transactionTotal?: number;
 }

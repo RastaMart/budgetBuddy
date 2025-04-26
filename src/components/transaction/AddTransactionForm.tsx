@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { Plus } from "lucide-react";
-import { CSVImport } from "./CSVImport";
-import { Modal } from "../shared/Modal";
-import { useAuth } from "../../hooks/useContext";
-import { supabase } from "../../lib/supabase";
+import React, { useState, useEffect } from 'react';
+import { Plus } from 'lucide-react';
+import { CSVImport } from './CSVImport';
+import { Transaction } from '../../types/transaction';
+import { Category } from '../../types/category';
 
 interface FormData {
   category_id: string;
@@ -13,23 +12,13 @@ interface FormData {
   date: string;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  type: 'spending' | 'income' | 'shared_income';
-  budget: {
-    id: string;
-    name: string;
-  };
-}
-
 interface AddTransactionFormProps {
   formData: FormData;
   onSubmit: (e: React.FormEvent) => void;
   onChange: (data: Partial<FormData>) => void;
   categories: Category[];
   selectedCategoryId?: string;
-  onBulkImport?: (transactions: any[]) => void;
+  onBulkImport?: (transactions: Transaction[]) => void;
   onClose?: () => void;
 }
 
@@ -42,20 +31,25 @@ export function AddTransactionForm({
   onBulkImport,
   onClose,
 }: AddTransactionFormProps) {
-  const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<"manual" | "bulk">("manual");
-  const [groupedCategories, setGroupedCategories] = useState<{[key: string]: Category[]}>({});
+  // useAuth();
+  const [activeTab, setActiveTab] = useState<'manual' | 'bulk'>('manual');
+  const [groupedCategories, setGroupedCategories] = useState<{
+    [key: string]: Category[];
+  }>({});
 
   useEffect(() => {
     // Group categories by budget
-    const grouped = categories.reduce((acc: {[key: string]: Category[]}, category) => {
-      const budgetName = category.budget?.name || 'Uncategorized';
-      if (!acc[budgetName]) {
-        acc[budgetName] = [];
-      }
-      acc[budgetName].push(category);
-      return acc;
-    }, {});
+    const grouped = categories.reduce(
+      (acc: { [key: string]: Category[] }, category) => {
+        const budgetName = category.budget?.name || 'Uncategorized';
+        if (!acc[budgetName]) {
+          acc[budgetName] = [];
+        }
+        acc[budgetName].push(category);
+        return acc;
+      },
+      {}
+    );
     setGroupedCategories(grouped);
   }, [categories]);
 
@@ -65,28 +59,28 @@ export function AddTransactionForm({
       <div className="flex border-b border-gray-200 mb-4">
         <button
           className={`px-4 py-2 font-medium text-sm ${
-            activeTab === "manual"
-              ? "border-b-2 border-indigo-500 text-indigo-600"
-              : "text-gray-500 hover:text-gray-700"
+            activeTab === 'manual'
+              ? 'border-b-2 border-indigo-500 text-indigo-600'
+              : 'text-gray-500 hover:text-gray-700'
           }`}
-          onClick={() => setActiveTab("manual")}
+          onClick={() => setActiveTab('manual')}
         >
           Manual Import
         </button>
         <button
           className={`px-4 py-2 font-medium text-sm ${
-            activeTab === "bulk"
-              ? "border-b-2 border-indigo-500 text-indigo-600"
-              : "text-gray-500 hover:text-gray-700"
+            activeTab === 'bulk'
+              ? 'border-b-2 border-indigo-500 text-indigo-600'
+              : 'text-gray-500 hover:text-gray-700'
           }`}
-          onClick={() => setActiveTab("bulk")}
+          onClick={() => setActiveTab('bulk')}
         >
           Bulk Import
         </button>
       </div>
 
       {/* Manual Import Form */}
-      {activeTab === "manual" && (
+      {activeTab === 'manual' && (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
             {!selectedCategoryId && (
@@ -104,15 +98,17 @@ export function AddTransactionForm({
                   onChange={(e) => onChange({ category_id: e.target.value })}
                 >
                   <option value="">Select a category</option>
-                  {Object.entries(groupedCategories).map(([budgetName, cats]) => (
-                    <optgroup key={budgetName} label={budgetName}>
-                      {cats.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
+                  {Object.entries(groupedCategories).map(
+                    ([budgetName, cats]) => (
+                      <optgroup key={budgetName} label={budgetName}>
+                        {cats.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )
+                  )}
                 </select>
               </div>
             )}
@@ -183,11 +179,11 @@ export function AddTransactionForm({
       )}
 
       {/* Bulk Import Form */}
-      {activeTab === "bulk" && (
+      {activeTab === 'bulk' && (
         <div className="space-y-6">
           <CSVImport
             onTransactionsLoaded={onBulkImport || (() => {})}
-            categories={categories}
+            // categories={categories}
             onClose={onClose}
           />
         </div>

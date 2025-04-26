@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { Trash2, Plus, ChevronRight, ChevronDown } from "lucide-react";
-import { ProgressBar } from "./ProgressBar";
-import { Category } from "../../types/category";
-import { getTimeProgress } from "../../utils/timeProgress";
-import { Modal } from "../shared/Modal";
-import { AddTransactionForm } from "../transaction/AddTransactionForm";
-import { TransactionItem } from "../transaction/TransactionItem";
-import { useAuth } from "../../hooks/useContext";
-import { supabase } from "../../lib/supabase";
+import React, { useState, useEffect } from 'react';
+import { Trash2, Plus, ChevronRight, ChevronDown } from 'lucide-react';
+import { ProgressBar } from './ProgressBar';
+import { Category } from '../../types/category';
+import { getTimeProgress } from '../../utils/timeProgress';
+import { Modal } from '../shared/Modal';
+import { AddTransactionForm } from '../transaction/AddTransactionForm';
+import { TransactionItem } from '../transaction/TransactionItem';
+import { useAuth } from '../../hooks/useContext';
+import { supabase } from '../../lib/supabase';
 
 interface Transaction {
   id: string;
@@ -29,12 +29,10 @@ interface AllocationStats {
 
 export function CategoryItem({
   category,
-  timeframe,
   onDelete,
   onTransactionAdded,
 }: {
   category: Category;
-  timeframe: string;
   onDelete: (id: string) => void;
   onTransactionAdded: () => void;
 }) {
@@ -45,17 +43,17 @@ export function CategoryItem({
   const [allocationStats, setAllocationStats] = useState<AllocationStats[]>([]);
   const [formData, setFormData] = useState({
     category_id: category.id,
-    allocation_id: "",
-    amount: "",
-    description: "",
-    date: new Date().toISOString().split("T")[0],
+    allocation_id: '',
+    amount: '',
+    description: '',
+    date: new Date().toISOString().split('T')[0],
   });
 
   const spentPercentage = ((category.total_spent || 0) / category.amount) * 100;
   const timeProgress = getTimeProgress(category.timeframe);
 
   useEffect(() => {
-    if (category.type === "shared_income") {
+    if (category.type === 'shared_income') {
       calculateAllocationStats();
     }
   }, [category, category.amount, category.timeframe]);
@@ -69,34 +67,40 @@ export function CategoryItem({
   async function calculateAllocationStats() {
     try {
       const { data: allocations } = await supabase
-        .from("category_allocations")
-        .select("*")
-        .eq("category_id", category.id);
+        .from('category_allocations')
+        .select('*')
+        .eq('category_id', category.id);
 
       if (!allocations?.length) return;
 
       const stats = await Promise.all(
         allocations.map(async (allocation) => {
-          let name = "";
+          let name = '';
           let percentage = 0;
           let reference_total = 0;
 
-          if (allocation.allocation_type === "dynamic" && allocation.reference_category_id) {
+          if (
+            allocation.allocation_type === 'dynamic' &&
+            allocation.reference_category_id
+          ) {
             // Fetch reference category details
-            const { data: refCategory } = await supabase
-              .from("categories")
-              .select("name, budget:budgets(name)")
-              .eq("id", allocation.reference_category_id)
-              .single();
+            const {
+              data: refCategory,
+            }: { data: { name: string; budget: { name: string } } | null } =
+              await supabase
+                .from('categories')
+                .select('name, budget:budgets(name)')
+                .eq('id', allocation.reference_category_id)
+                .single();
 
             if (refCategory) {
               name = `${refCategory.budget.name} - ${refCategory.name}`;
-              
+
               // Get reference category transactions
               const { data: refTransactions } = await supabase
-                .from("transactions")
-                .select("amount")
-                .eq("category_id", allocation.reference_category_id);
+                .from('transactions')
+                .select('amount')
+                .eq('category_id', allocation.reference_category_id);
 
               reference_total = (refTransactions || []).reduce(
                 (sum, t) => sum + (t.amount || 0),
@@ -110,10 +114,10 @@ export function CategoryItem({
 
           // Calculate total spent for this allocation
           const { data: allocationTransactions } = await supabase
-            .from("transactions")
-            .select("amount")
-            .eq("category_id", category.id)
-            .eq("allocation_id", allocation.id);
+            .from('transactions')
+            .select('amount')
+            .eq('category_id', category.id)
+            .eq('allocation_id', allocation.id);
 
           const total_spent = (allocationTransactions || []).reduce(
             (sum, t) => sum + (t.amount || 0),
@@ -126,45 +130,58 @@ export function CategoryItem({
             percentage,
             amount: category.amount ? (category.amount * percentage) / 100 : 0,
             total_spent,
-            reference_total: allocation.allocation_type === "dynamic" ? reference_total : undefined
+            reference_total:
+              allocation.allocation_type === 'dynamic'
+                ? reference_total
+                : undefined,
           };
         })
       );
 
       // Calculate dynamic percentages based on total spending
       const totalSpent = stats.reduce((sum, stat) => sum + stat.total_spent, 0);
-      
-      const updatedStats = stats.map(stat => ({
+
+      const updatedStats = stats.map((stat) => ({
         ...stat,
-        percentage: stat.percentage || (totalSpent > 0 ? (stat.total_spent / totalSpent) * 100 : 0)
+        percentage:
+          stat.percentage ||
+          (totalSpent > 0 ? (stat.total_spent / totalSpent) * 100 : 0),
       }));
 
       setAllocationStats(updatedStats);
     } catch (error) {
-      console.error("Error calculating allocation stats:", error);
+      console.error('Error calculating allocation stats:', error);
     }
   }
 
   async function fetchTransactions() {
     try {
       const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("category_id", category.id)
-        .order("date", { ascending: false });
+        .from('transactions')
+        .select('*')
+        .eq('category_id', category.id)
+        .order('date', { ascending: false });
 
       if (error) throw error;
       setTransactions(data || []);
     } catch (error) {
-      console.error("Error fetching transactions:", error);
+      console.error('Error fetching transactions:', error);
     }
+  }
+
+  function onNewTransactionDataChange(data: Partial<typeof formData>) {
+    setFormData((prev) => ({
+      ...prev,
+      ...data,
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("transactions").insert({
-        user_id: user.id,
+      console.log('Form data:', formData);
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user?.id,
         category_id: category.id,
         allocation_id: formData.allocation_id || null,
         amount: parseFloat(formData.amount),
@@ -177,10 +194,10 @@ export function CategoryItem({
 
       setFormData({
         category_id: category.id,
-        allocation_id: "",
-        amount: "",
-        description: "",
-        date: new Date().toISOString().split("T")[0],
+        allocation_id: '',
+        amount: '',
+        description: '',
+        date: new Date().toISOString().split('T')[0],
       });
       setShowTransactionModal(false);
       onTransactionAdded();
@@ -189,7 +206,7 @@ export function CategoryItem({
       }
       calculateAllocationStats();
     } catch (error) {
-      console.error("Error adding transaction:", error);
+      console.error('Error adding transaction:', error);
     }
   }
 
@@ -213,21 +230,21 @@ export function CategoryItem({
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500">
-                ${category.total_spent?.toFixed(2) || "0.00"}
-                {category.amount_type === "fixed" && (
+                ${category.total_spent?.toFixed(2) || '0.00'}
+                {category.amount_type === 'fixed' && (
                   <>/${category.amount.toFixed(2)}</>
-                )}{" "}
-                {category.type === "spending" ? "spent" : "earned"}
+                )}{' '}
+                {category.type === 'spending' ? 'spent' : 'earned'}
               </span>
               <span
                 className={`text-xs px-2 py-1 rounded-full ${
-                  category.type === "shared_income"
-                    ? "bg-purple-100 text-purple-700"
-                    : "bg-gray-100 text-gray-600"
+                  category.type === 'shared_income'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                {category.type === "shared_income"
-                  ? "Shared Income"
+                {category.type === 'shared_income'
+                  ? 'Shared Income'
                   : category.type}
               </span>
             </div>
@@ -248,15 +265,16 @@ export function CategoryItem({
           </div>
         </div>
 
-        {category.amount_type === "fixed" && category.type !== "shared_income" && (
-          <ProgressBar
-            spentPercentage={spentPercentage}
-            timeProgress={timeProgress}
-            type={category.type}
-          />
-        )}
+        {category.amount_type === 'fixed' &&
+          category.type !== 'shared_income' && (
+            <ProgressBar
+              spentPercentage={spentPercentage}
+              timeProgress={timeProgress}
+              type={category.type}
+            />
+          )}
 
-        {category.type === "shared_income" && allocationStats.length > 0 && (
+        {category.type === 'shared_income' && allocationStats.length > 0 && (
           <div className="space-y-4">
             {allocationStats.map((allocation) => (
               <div key={allocation.id} className="space-y-2">
@@ -281,7 +299,9 @@ export function CategoryItem({
                   </div>
                 </div>
                 <ProgressBar
-                  spentPercentage={(allocation.total_spent / (allocation.amount || 1)) * 100}
+                  spentPercentage={
+                    (allocation.total_spent / (allocation.amount || 1)) * 100
+                  }
                   timeProgress={timeProgress}
                 />
               </div>
@@ -302,8 +322,9 @@ export function CategoryItem({
                   amount={transaction.amount}
                   date={transaction.date}
                   assignedDate={transaction.assigned_date}
-                  onDelete={() => {/* Handle delete */}}
-                  onTransactionAdded={onTransactionAdded}
+                  onDelete={() => {
+                    /* Handle delete */
+                  }}
                 />
               ))
             )}
@@ -319,7 +340,7 @@ export function CategoryItem({
         <AddTransactionForm
           formData={formData}
           onSubmit={handleSubmit}
-          onChange={setFormData}
+          onChange={onNewTransactionDataChange}
           categories={[category]}
           selectedCategoryId={category.id}
           onClose={() => setShowTransactionModal(false)}

@@ -2,7 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
-import { startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, subWeeks, startOfYear, endOfYear, subYears } from 'date-fns';
+import {
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  startOfWeek,
+  endOfWeek,
+  subWeeks,
+  startOfYear,
+  endOfYear,
+  subYears,
+} from 'date-fns';
+import { SharedIncomeAllocation } from '../../types/category';
+import { Budget } from '../../types/budget';
 
 interface FormData {
   name: string;
@@ -14,28 +26,17 @@ interface FormData {
   allocation_type: 'manual' | 'dynamic';
 }
 
-interface SharedIncomeAllocation {
-  name: string;
-  percentage: number;
-  isManual: boolean;
-  referenceCategory?: {
-    id: string;
-    budget_id: string;
-  };
-  transactionTotal?: number;
-}
+// interface Budget {
+//   id: string;
+//   name: string;
+//   categories: Category[];
+// }
 
-interface Budget {
-  id: string;
-  name: string;
-  categories: Category[];
-}
-
-interface Category {
-  id: string;
-  name: string;
-  type: 'spending' | 'income' | 'shared_income';
-}
+// interface Category {
+//   id: string;
+//   name: string;
+//   type: 'spending' | 'income' | 'shared_income';
+// }
 
 interface AddCategoryFormProps {
   formData: FormData;
@@ -43,7 +44,11 @@ interface AddCategoryFormProps {
   onChange: (data: Partial<FormData>) => void;
 }
 
-export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFormProps) {
+export function AddCategoryForm({
+  formData,
+  onSubmit,
+  onChange,
+}: AddCategoryFormProps) {
   const { user } = useAuth();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [newAllocation, setNewAllocation] = useState<SharedIncomeAllocation>({
@@ -51,7 +56,7 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
     percentage: 0,
     isManual: formData.allocation_type === 'manual',
     referenceCategory: undefined,
-    transactionTotal: 0
+    transactionTotal: 0,
   });
 
   useEffect(() => {
@@ -72,72 +77,82 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
       case 'weekly':
         return {
           start: startOfWeek(subWeeks(now, 1)),
-          end: endOfWeek(subWeeks(now, 1))
+          end: endOfWeek(subWeeks(now, 1)),
         };
       case 'biweekly':
         return {
           start: startOfWeek(subWeeks(now, 2)),
-          end: endOfWeek(subWeeks(now, 1))
+          end: endOfWeek(subWeeks(now, 1)),
         };
       case 'monthly':
         return {
           start: startOfMonth(subMonths(now, 1)),
-          end: endOfMonth(subMonths(now, 1))
+          end: endOfMonth(subMonths(now, 1)),
         };
       case 'yearly':
         return {
           start: startOfYear(subYears(now, 1)),
-          end: endOfYear(subYears(now, 1))
+          end: endOfYear(subYears(now, 1)),
         };
     }
   };
 
   async function fetchBudgetsAndCategories() {
+    if (!user) throw new Error('User not found');
     try {
       const { data: budgetsData, error: budgetsError } = await supabase
         .from('budgets')
-        .select(`
+        .select(
+          `
           id,
           name,
           budget_users!inner (user_id)
-        `)
+        `
+        )
         .eq('budget_users.user_id', user.id);
 
       if (budgetsError) throw budgetsError;
 
-      const budgetsWithCategories = await Promise.all((budgetsData || []).map(async (budget) => {
-        const { data: categories, error: categoriesError } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('budget_id', budget.id)
-          .eq('type', 'income');
+      const budgetsWithCategories = await Promise.all(
+        (budgetsData || []).map(async (budget) => {
+          const { data: categories, error: categoriesError } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('budget_id', budget.id)
+            .eq('type', 'income');
 
-        if (categoriesError) throw categoriesError;
+          if (categoriesError) throw categoriesError;
 
-        const categoriesWithTotals = await Promise.all((categories || []).map(async (category) => {
-          const { start, end } = getTimeframeDates();
-          
-          const { data: transactions } = await supabase
-            .from('transactions')
-            .select('amount')
-            .eq('category_id', category.id)
-            .gte('date', start.toISOString())
-            .lte('date', end.toISOString());
+          const categoriesWithTotals = await Promise.all(
+            (categories || []).map(async (category) => {
+              const { start, end } = getTimeframeDates();
 
-          const total = (transactions || []).reduce((sum, t) => sum + (t.amount || 0), 0);
-          
+              const { data: transactions } = await supabase
+                .from('transactions')
+                .select('amount')
+                .eq('category_id', category.id)
+                .gte('date', start.toISOString())
+                .lte('date', end.toISOString());
+
+              const total = (transactions || []).reduce(
+                (sum, t) => sum + (t.amount || 0),
+                0
+              );
+
+              return {
+                ...category,
+                transactionTotal: total,
+              };
+            })
+          );
+
           return {
-            ...category,
-            transactionTotal: total
+            id: budget.id,
+            name: budget.name,
+            categories: categoriesWithTotals,
           };
-        }));
-
-        return {
-          id: budget.id,
-          name: budget.name,
-          categories: categoriesWithTotals
-        };
-      }));
+        })
+      );
 
       setBudgets(budgetsWithCategories);
     } catch (error) {
@@ -145,16 +160,22 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
     }
   }
 
-  const totalPercentage = (formData.allocations || []).reduce((sum, allocation) => 
-    sum + allocation.percentage, 0
+  const totalPercentage = (formData.allocations || []).reduce(
+    (sum, allocation) => sum + allocation.percentage,
+    0
   );
 
   const handleAddAllocation = async () => {
     const isManual = formData.allocation_type === 'manual';
-    if (newAllocation.name && (isManual ? newAllocation.percentage > 0 : newAllocation.referenceCategory)) {
+    if (
+      newAllocation.name &&
+      (isManual
+        ? newAllocation.percentage > 0
+        : newAllocation.referenceCategory)
+    ) {
       if (!isManual && newAllocation.referenceCategory) {
         const { start, end } = getTimeframeDates();
-        
+
         const { data: transactions } = await supabase
           .from('transactions')
           .select('amount')
@@ -162,12 +183,15 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
           .gte('date', start.toISOString())
           .lte('date', end.toISOString());
 
-        const total = (transactions || []).reduce((sum, t) => sum + (t.amount || 0), 0);
+        const total = (transactions || []).reduce(
+          (sum, t) => sum + (t.amount || 0),
+          0
+        );
         newAllocation.transactionTotal = total;
       }
 
       onChange({
-        allocations: [...(formData.allocations || []), newAllocation]
+        allocations: [...(formData.allocations || []), newAllocation],
       });
 
       setNewAllocation({
@@ -175,14 +199,14 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
         percentage: 0,
         isManual,
         referenceCategory: undefined,
-        transactionTotal: 0
+        transactionTotal: 0,
       });
     }
   };
 
   const handleRemoveAllocation = (index: number) => {
     onChange({
-      allocations: (formData.allocations || []).filter((_, i) => i !== index)
+      allocations: (formData.allocations || []).filter((_, i) => i !== index),
     });
   };
 
@@ -192,18 +216,18 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
         ...newAllocation,
         referenceCategory: undefined,
         name: '',
-        transactionTotal: 0
+        transactionTotal: 0,
       });
       return;
     }
 
     const [budgetId, categoryId] = value.split('|');
-    const budget = budgets.find(b => b.id === budgetId);
-    const category = budget?.categories.find(c => c.id === categoryId);
-    
+    const budget = budgets.find((b) => b.id === budgetId);
+    const category = budget?.categories?.find((c) => c.id === categoryId);
+
     if (category && budget) {
       const { start, end } = getTimeframeDates();
-      
+
       const { data: transactions } = await supabase
         .from('transactions')
         .select('amount')
@@ -211,22 +235,26 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
         .gte('date', start.toISOString())
         .lte('date', end.toISOString());
 
-      const total = (transactions || []).reduce((sum, t) => sum + (t.amount || 0), 0);
+      const total = (transactions || []).reduce(
+        (sum, t) => sum + (t.amount || 0),
+        0
+      );
 
       setNewAllocation({
         ...newAllocation,
         referenceCategory: {
           id: category.id,
-          budget_id: budget.id
+          budget_id: budget.id,
         },
         name: `${budget.name} - ${category.name}`,
-        transactionTotal: total
+        transactionTotal: total,
       });
     }
   };
 
-  const totalTransactions = formData.allocations.reduce((sum, allocation) => 
-    sum + (allocation.transactionTotal || 0), 0
+  const totalTransactions = formData.allocations.reduce(
+    (sum, allocation) => sum + (allocation.transactionTotal || 0),
+    0
   );
 
   const getTimeframeDescription = () => {
@@ -237,7 +265,10 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
   return (
     <form onSubmit={onSubmit} className="space-y-6">
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="name"
+          className="block text-sm font-medium text-gray-700"
+        >
           Category Name
         </label>
         <input
@@ -263,10 +294,15 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                 name="type"
                 value="spending"
                 checked={formData.type === 'spending'}
-                onChange={(e) => onChange({ 
-                  type: e.target.value as 'spending' | 'income' | 'shared_income',
-                  allocations: []
-                })}
+                onChange={(e) =>
+                  onChange({
+                    type: e.target.value as
+                      | 'spending'
+                      | 'income'
+                      | 'shared_income',
+                    allocations: [],
+                  })
+                }
               />
               <span className="ml-2">Spending</span>
             </label>
@@ -278,10 +314,15 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                 name="type"
                 value="income"
                 checked={formData.type === 'income'}
-                onChange={(e) => onChange({ 
-                  type: e.target.value as 'spending' | 'income' | 'shared_income',
-                  allocations: []
-                })}
+                onChange={(e) =>
+                  onChange({
+                    type: e.target.value as
+                      | 'spending'
+                      | 'income'
+                      | 'shared_income',
+                    allocations: [],
+                  })
+                }
               />
               <span className="ml-2">Income</span>
             </label>
@@ -293,11 +334,16 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                 name="type"
                 value="shared_income"
                 checked={formData.type === 'shared_income'}
-                onChange={(e) => onChange({ 
-                  type: e.target.value as 'spending' | 'income' | 'shared_income',
-                  allocations: [],
-                  allocation_type: 'manual'
-                })}
+                onChange={(e) =>
+                  onChange({
+                    type: e.target.value as
+                      | 'spending'
+                      | 'income'
+                      | 'shared_income',
+                    allocations: [],
+                    allocation_type: 'manual',
+                  })
+                }
               />
               <span className="ml-2">Shared Income</span>
             </label>
@@ -316,7 +362,11 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                 name="amount_type"
                 value="fixed"
                 checked={formData.amount_type === 'fixed'}
-                onChange={(e) => onChange({ amount_type: e.target.value as 'fixed' | 'flexible' })}
+                onChange={(e) =>
+                  onChange({
+                    amount_type: e.target.value as 'fixed' | 'flexible',
+                  })
+                }
               />
               <span className="ml-2">Fixed</span>
             </label>
@@ -328,7 +378,11 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                 name="amount_type"
                 value="flexible"
                 checked={formData.amount_type === 'flexible'}
-                onChange={(e) => onChange({ amount_type: e.target.value as 'fixed' | 'flexible' })}
+                onChange={(e) =>
+                  onChange({
+                    amount_type: e.target.value as 'fixed' | 'flexible',
+                  })
+                }
               />
               <span className="ml-2">Flexible</span>
             </label>
@@ -337,14 +391,21 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
       </div>
 
       <div>
-        <label htmlFor="timeframe" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="timeframe"
+          className="block text-sm font-medium text-gray-700"
+        >
           Timeframe
         </label>
         <select
           id="timeframe"
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           value={formData.timeframe}
-          onChange={(e) => onChange({ timeframe: e.target.value as 'weekly' | 'monthly' | 'yearly' })}
+          onChange={(e) =>
+            onChange({
+              timeframe: e.target.value as 'weekly' | 'monthly' | 'yearly',
+            })
+          }
           required
         >
           <option value="weekly">Weekly</option>
@@ -356,7 +417,10 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
 
       {formData.amount_type === 'fixed' && (
         <div>
-          <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="amount"
+            className="block text-sm font-medium text-gray-700"
+          >
             Budget Amount
           </label>
           <input
@@ -385,10 +449,12 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                   name="allocation_type"
                   value="manual"
                   checked={formData.allocation_type === 'manual'}
-                  onChange={(e) => onChange({ 
-                    allocation_type: e.target.value as 'manual' | 'dynamic',
-                    allocations: []
-                  })}
+                  onChange={(e) =>
+                    onChange({
+                      allocation_type: e.target.value as 'manual' | 'dynamic',
+                      allocations: [],
+                    })
+                  }
                 />
                 <span className="ml-2">Manual</span>
               </label>
@@ -399,10 +465,12 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                   name="allocation_type"
                   value="dynamic"
                   checked={formData.allocation_type === 'dynamic'}
-                  onChange={(e) => onChange({ 
-                    allocation_type: e.target.value as 'manual' | 'dynamic',
-                    allocations: []
-                  })}
+                  onChange={(e) =>
+                    onChange({
+                      allocation_type: e.target.value as 'manual' | 'dynamic',
+                      allocations: [],
+                    })
+                  }
                 />
                 <span className="ml-2">Dynamic</span>
               </label>
@@ -413,7 +481,9 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
             <h3 className="text-sm font-medium text-gray-700">Allocations</h3>
             <div className="text-right">
               {formData.allocation_type === 'manual' && (
-                <span className={`text-sm ${totalPercentage === 100 ? 'text-green-600' : 'text-red-600'}`}>
+                <span
+                  className={`text-sm ${totalPercentage === 100 ? 'text-green-600' : 'text-red-600'}`}
+                >
                   Total: {totalPercentage}%
                 </span>
               )}
@@ -424,7 +494,10 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
           </div>
 
           {(formData.allocations || []).map((allocation, index) => (
-            <div key={index} className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg">
+            <div
+              key={index}
+              className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg"
+            >
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium">{allocation.name}</p>
@@ -434,20 +507,33 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                         ${allocation.transactionTotal.toFixed(2)}
                         {totalTransactions > 0 && (
                           <span className="ml-2 text-gray-500">
-                            ({((allocation.transactionTotal / totalTransactions) * 100).toFixed(1)}%)
+                            (
+                            {(
+                              (allocation.transactionTotal /
+                                totalTransactions) *
+                              100
+                            ).toFixed(1)}
+                            %)
                           </span>
                         )}
                       </p>
                     )}
                     {formData.amount && parseFloat(formData.amount) > 0 && (
                       <p className="text-xs text-gray-500">
-                        Target: ${((parseFloat(formData.amount) * (allocation.percentage || 0)) / 100).toFixed(2)}
+                        Target: $
+                        {(
+                          (parseFloat(formData.amount) *
+                            (allocation.percentage || 0)) /
+                          100
+                        ).toFixed(2)}
                       </p>
                     )}
                   </div>
                 </div>
                 <p className="text-sm text-gray-500">
-                  {formData.allocation_type === 'manual' ? `${allocation.percentage}%` : 'Dynamic'}
+                  {formData.allocation_type === 'manual'
+                    ? `${allocation.percentage}%`
+                    : 'Dynamic'}
                 </p>
               </div>
               <button
@@ -470,7 +556,12 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                   <input
                     type="text"
                     value={newAllocation.name}
-                    onChange={(e) => setNewAllocation({ ...newAllocation, name: e.target.value })}
+                    onChange={(e) =>
+                      setNewAllocation({
+                        ...newAllocation,
+                        name: e.target.value,
+                      })
+                    }
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   />
                 </div>
@@ -484,10 +575,12 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                     max="100"
                     step="0.01"
                     value={newAllocation.percentage}
-                    onChange={(e) => setNewAllocation({ 
-                      ...newAllocation, 
-                      percentage: parseFloat(e.target.value) || 0 
-                    })}
+                    onChange={(e) =>
+                      setNewAllocation({
+                        ...newAllocation,
+                        percentage: parseFloat(e.target.value) || 0,
+                      })
+                    }
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   />
                 </div>
@@ -499,15 +592,22 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
                     Reference Category
                   </label>
                   <select
-                    value={newAllocation.referenceCategory ? `${newAllocation.referenceCategory.budget_id}|${newAllocation.referenceCategory.id}` : ''}
+                    value={
+                      newAllocation.referenceCategory
+                        ? `${newAllocation.referenceCategory.budget_id}|${newAllocation.referenceCategory.id}`
+                        : ''
+                    }
                     onChange={(e) => handleReferenceChange(e.target.value)}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   >
                     <option value="">Select category</option>
-                    {budgets.map(budget => (
+                    {budgets.map((budget) => (
                       <optgroup key={budget.id} label={budget.name}>
-                        {budget.categories.map(category => (
-                          <option key={category.id} value={`${budget.id}|${category.id}`}>
+                        {budget.categories?.map((category) => (
+                          <option
+                            key={category.id}
+                            value={`${budget.id}|${category.id}`}
+                          >
                             {category.name}
                           </option>
                         ))}
@@ -524,8 +624,8 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
               type="button"
               onClick={handleAddAllocation}
               disabled={
-                formData.allocation_type === 'manual' 
-                  ? (!newAllocation.name || newAllocation.percentage <= 0)
+                formData.allocation_type === 'manual'
+                  ? !newAllocation.name || newAllocation.percentage <= 0
                   : !newAllocation.referenceCategory
               }
               className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
@@ -540,7 +640,11 @@ export function AddCategoryForm({ formData, onSubmit, onChange }: AddCategoryFor
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={formData.type === 'shared_income' && formData.allocation_type === 'manual' && totalPercentage !== 100}
+          disabled={
+            formData.type === 'shared_income' &&
+            formData.allocation_type === 'manual' &&
+            totalPercentage !== 100
+          }
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
         >
           <Plus className="w-4 h-4 mr-2" />

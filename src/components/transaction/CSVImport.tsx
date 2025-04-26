@@ -1,27 +1,28 @@
-import React, { useState, useRef } from "react";
-import { Upload } from "lucide-react";
-import { supabase } from "../../lib/supabase";
-import { useAuth } from "../../hooks/useContext";
+import React, { useState, useRef } from 'react';
+import { Upload } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useContext';
 import {
   parseDate,
   cleanAmount,
   cleanDescription,
-} from "../../utils/dateParser";
-import { format, parseISO } from "date-fns";
-import { Amount } from "../shared/Amount";
+} from '../../utils/dateParser';
+import { format, parseISO } from 'date-fns';
+import { Amount } from '../shared/Amount';
+import { Transaction } from '../../types/transaction';
 
 interface CSVTransaction {
   date: string;
   description: string;
   amount: string;
-  budget?: string;
+  // budget?: string;
   isDuplicate?: boolean;
   selected?: boolean;
 }
 
 interface CSVImportProps {
-  onTransactionsLoaded: (transactions: CSVTransaction[]) => void;
-  budgets: Array<{ id: string; name: string }>;
+  onTransactionsLoaded: (transactions: Transaction[]) => void;
+  // budgets: Array<{ id: string; name: string }>;
   onClose?: () => void;
 }
 
@@ -38,7 +39,7 @@ interface ImportError {
 
 export function CSVImport({
   onTransactionsLoaded,
-  budgets,
+  // budgets,
   onClose,
 }: CSVImportProps) {
   const { user } = useAuth();
@@ -46,16 +47,16 @@ export function CSVImport({
   const [error, setError] = useState<string | null>(null);
   const [csvPreview, setCsvPreview] = useState<CSVPreview | null>(null);
   const [mappingStep, setMappingStep] = useState<
-    | "initial"
-    | "date"
-    | "description"
-    | "amount-type"
-    | "amount"
-    | "amount-split"
-    | "review"
-    | "importing"
-    | "complete"
-  >("initial");
+    | 'initial'
+    | 'date'
+    | 'description'
+    | 'amount-type'
+    | 'amount'
+    | 'amount-split'
+    | 'review'
+    | 'importing'
+    | 'complete'
+  >('initial');
   const [columnMapping, setColumnMapping] = useState<{
     date?: number;
     description?: number;
@@ -89,18 +90,19 @@ export function CSVImport({
   const processCSV = async (file: File) => {
     try {
       const text = await file.text();
-      const lines = text.split("\n");
-      const headers = lines[0].split(",").map((h) => h.trim());
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map((h) => h.trim());
       const rows = lines
         .slice(1)
         .filter((line) => line.trim())
-        .map((line) => line.split(",").map((cell) => cell.trim()));
+        .map((line) => line.split(',').map((cell) => cell.trim()));
 
       setCsvPreview({ headers, rows });
-      setMappingStep("date");
-    } catch (err) {
+      setMappingStep('date');
+    } catch (error) {
+      console.error('Error processing CSV file:', error);
       setError(
-        "Error processing CSV file. Please check the format and try again."
+        'Error processing CSV file. Please check the format and try again.'
       );
     }
   };
@@ -110,10 +112,10 @@ export function CSVImport({
     setIsDragging(false);
 
     const file = e.dataTransfer.files[0];
-    if (file && file.type === "text/csv") {
+    if (file && file.type === 'text/csv') {
       await processCSV(file);
     } else {
-      setError("Please upload a CSV file");
+      setError('Please upload a CSV file');
     }
   };
 
@@ -128,22 +130,22 @@ export function CSVImport({
     const newMapping = { ...columnMapping };
 
     switch (mappingStep) {
-      case "date":
+      case 'date':
         newMapping.date = columnIndex;
         setColumnMapping(newMapping);
-        setMappingStep("description");
+        setMappingStep('description');
         break;
-      case "description":
+      case 'description':
         newMapping.description = columnIndex;
         setColumnMapping(newMapping);
-        setMappingStep("amount-type");
+        setMappingStep('amount-type');
         break;
-      case "amount":
+      case 'amount':
         newMapping.amount = columnIndex;
         setColumnMapping(newMapping);
         await processTransactions(newMapping);
         break;
-      case "amount-split":
+      case 'amount-split':
         if (!newMapping.spending) {
           newMapping.spending = columnIndex;
           setColumnMapping(newMapping);
@@ -165,24 +167,25 @@ export function CSVImport({
     );
     const transactionsWithDuplicates = await checkForDuplicates(transactions);
     setParsedTransactions(transactionsWithDuplicates);
-    setMappingStep("review");
+    setMappingStep('review');
   };
 
   const handleAmountTypeSelection = (singleColumn: boolean) => {
     setIsSingleAmountColumn(singleColumn);
-    setMappingStep(singleColumn ? "amount" : "amount-split");
+    setMappingStep(singleColumn ? 'amount' : 'amount-split');
   };
+  if (user === null) throw new Error('User is not authenticated');
 
   const checkForDuplicates = async (transactions: CSVTransaction[]) => {
     const duplicateChecks = await Promise.all(
       transactions.map(async (transaction) => {
         const { data } = await supabase
-          .from("transactions")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("date", transaction.date)
-          .eq("description", transaction.description)
-          .eq("amount", parseFloat(transaction.amount));
+          .from('transactions')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('date', transaction.date)
+          .eq('description', transaction.description)
+          .eq('amount', parseFloat(transaction.amount));
 
         return {
           ...transaction,
@@ -209,10 +212,10 @@ export function CSVImport({
 
     for (const [index, row] of rows.entries()) {
       const errors: string[] = [];
-      let transaction: CSVTransaction = {
-        date: "",
-        description: "",
-        amount: "0",
+      const transaction: CSVTransaction = {
+        date: '',
+        description: '',
+        amount: '0',
         selected: true,
       };
 
@@ -230,14 +233,14 @@ export function CSVImport({
       if (mapping.description !== undefined) {
         const cleanedDescription = cleanDescription(row[mapping.description]);
         if (!cleanedDescription) {
-          errors.push("Description is required");
+          errors.push('Description is required');
         } else {
           transaction.description = cleanedDescription;
         }
       }
 
       // Parse amount
-      let amount = "0";
+      let amount = '0';
       if (isSingleAmountColumn && mapping.amount !== undefined) {
         amount = cleanAmount(row[mapping.amount]);
       } else if (!isSingleAmountColumn && mapping.spending && mapping.deposit) {
@@ -246,8 +249,8 @@ export function CSVImport({
         amount = (parseFloat(deposit) - parseFloat(spending)).toString();
       }
 
-      if (amount === "0" || isNaN(parseFloat(amount))) {
-        errors.push("Invalid amount");
+      if (amount === '0' || isNaN(parseFloat(amount))) {
+        errors.push('Invalid amount');
       } else {
         transaction.amount = amount;
       }
@@ -275,7 +278,7 @@ export function CSVImport({
   };
 
   const importTransactions = async (transactions: CSVTransaction[]) => {
-    setMappingStep("importing");
+    setMappingStep('importing');
     const stats = {
       total: transactions.length,
       successful: 0,
@@ -283,11 +286,11 @@ export function CSVImport({
       errors: [] as ImportError[],
     };
 
-    const selectedTransactions = transactions.filter((t) => t.selected);
+    const selectedCSVTransactions = transactions.filter((t) => t.selected);
 
-    for (const transaction of selectedTransactions) {
+    for (const transaction of selectedCSVTransactions) {
       try {
-        const { error } = await supabase.from("transactions").insert({
+        const { error } = await supabase.from('transactions').insert({
           user_id: user.id,
           amount: parseFloat(transaction.amount),
           description: transaction.description,
@@ -302,14 +305,26 @@ export function CSVImport({
         stats.failed++;
         stats.errors.push({
           row: stats.successful + stats.failed,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: error instanceof Error ? error.message : 'Unknown error',
           data: transaction,
         });
       }
     }
 
     setImportStats(stats);
-    setMappingStep("complete");
+    setMappingStep('complete');
+
+    const selectedTransactions: Transaction[] = selectedCSVTransactions.map(
+      (t) =>
+        ({
+          user_id: user.id,
+          amount: parseFloat(t.amount),
+          description: t.description,
+          date: t.date,
+          assigned_date: t.date,
+          budget_id: null,
+        }) as unknown as Transaction
+    );
     onTransactionsLoaded(selectedTransactions);
   };
 
@@ -333,8 +348,8 @@ export function CSVImport({
                       columnMapping.amount === i ||
                       columnMapping.spending === i ||
                       columnMapping.deposit === i
-                        ? "bg-indigo-50 text-indigo-700"
-                        : "text-gray-500"
+                        ? 'bg-indigo-50 text-indigo-700'
+                        : 'text-gray-500'
                     }`}
                     onClick={() => handleColumnSelect(i)}
                   >
@@ -345,7 +360,7 @@ export function CSVImport({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {csvPreview?.rows.map((row, i) => (
-                <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {row.map((cell, j) => (
                     <td
                       key={j}
@@ -355,8 +370,8 @@ export function CSVImport({
                         columnMapping.amount === j ||
                         columnMapping.spending === j ||
                         columnMapping.deposit === j
-                          ? "text-indigo-900 bg-indigo-50"
-                          : "text-gray-500"
+                          ? 'text-indigo-900 bg-indigo-50'
+                          : 'text-gray-500'
                       }`}
                       onClick={() => handleColumnSelect(j)}
                     >
@@ -414,7 +429,7 @@ export function CSVImport({
               {parsedTransactions.map((transaction, index) => (
                 <tr
                   key={index}
-                  className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                 >
                   <td className="px-4 py-2">
                     <input
@@ -436,7 +451,7 @@ export function CSVImport({
                     )}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
-                    {format(parseISO(transaction.date), "PPP")}
+                    {format(parseISO(transaction.date), 'PPP')}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
                     {transaction.description}
@@ -452,7 +467,7 @@ export function CSVImport({
         <div className="p-4 border-t bg-gray-50">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
-              {parsedTransactions.filter((t) => t.selected).length} of{" "}
+              {parsedTransactions.filter((t) => t.selected).length} of{' '}
               {parsedTransactions.length} transactions selected
             </div>
             <div className="flex gap-2">
@@ -480,17 +495,17 @@ export function CSVImport({
     if (!csvPreview) return null;
 
     switch (mappingStep) {
-      case "date":
+      case 'date':
         return renderColumnSelection(
-          "Select Date Column",
-          "Click on the column header or any cell in the column that contains transaction dates"
+          'Select Date Column',
+          'Click on the column header or any cell in the column that contains transaction dates'
         );
-      case "description":
+      case 'description':
         return renderColumnSelection(
-          "Select Description Column",
-          "Click on the column header or any cell in the column that contains transaction descriptions"
+          'Select Description Column',
+          'Click on the column header or any cell in the column that contains transaction descriptions'
         );
-      case "amount-type":
+      case 'amount-type':
         return (
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900">
@@ -522,23 +537,23 @@ export function CSVImport({
             </div>
           </div>
         );
-      case "amount":
+      case 'amount':
         return renderColumnSelection(
-          "Select Amount Column",
-          "Click on the column header or any cell in the column that contains transaction amounts"
+          'Select Amount Column',
+          'Click on the column header or any cell in the column that contains transaction amounts'
         );
-      case "amount-split":
+      case 'amount-split':
         return renderColumnSelection(
           columnMapping.spending
-            ? "Select Deposit Column"
-            : "Select Spending Column",
+            ? 'Select Deposit Column'
+            : 'Select Spending Column',
           columnMapping.spending
-            ? "Click on the column header or any cell in the column that contains deposit amounts"
-            : "Click on the column header or any cell in the column that contains spending amounts"
+            ? 'Click on the column header or any cell in the column that contains deposit amounts'
+            : 'Click on the column header or any cell in the column that contains spending amounts'
         );
-      case "review":
+      case 'review':
         return renderReviewStep();
-      case "importing":
+      case 'importing':
         return (
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center justify-center">
@@ -549,7 +564,7 @@ export function CSVImport({
             </div>
           </div>
         );
-      case "complete":
+      case 'complete':
         return (
           <div className="bg-white rounded-lg shadow">
             <div className="p-6">
@@ -655,12 +670,12 @@ export function CSVImport({
 
   return (
     <div className="space-y-4">
-      {mappingStep === "initial" && (
+      {mappingStep === 'initial' && (
         <div
           className={`relative border-2 border-dashed rounded-lg p-8 text-center ${
             isDragging
-              ? "border-indigo-500 bg-indigo-50"
-              : "border-gray-300 bg-gray-50"
+              ? 'border-indigo-500 bg-indigo-50'
+              : 'border-gray-300 bg-gray-50'
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -675,7 +690,7 @@ export function CSVImport({
           />
           <Upload className="mx-auto h-12 w-12 text-gray-400" />
           <p className="mt-2 text-sm text-gray-600">
-            Drag and drop your CSV file here, or{" "}
+            Drag and drop your CSV file here, or{' '}
             <button
               type="button"
               className="text-indigo-600 hover:text-indigo-500"

@@ -17,25 +17,24 @@ interface TransactionItemProps {
   onAssignedDateChange?: () => void;
 }
 
-export function TransactionItem({ 
-  id, 
-  description, 
-  amount, 
+export function TransactionItem({
+  id,
+  description,
+  amount,
   date,
   assignedDate,
   categoryName,
-  allocationId,
   allocationName,
   onDelete,
-  onAssignedDateChange
+  onAssignedDateChange,
 }: TransactionItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [newAssignedDate, setNewAssignedDate] = useState(assignedDate);
-  
+
   const handleDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = e.target.value;
     setNewAssignedDate(newDate);
-    
+
     try {
       const { error } = await supabase
         .from('transactions')
@@ -43,7 +42,7 @@ export function TransactionItem({
         .eq('id', id);
 
       if (error) throw error;
-      
+
       if (onAssignedDateChange) {
         onAssignedDateChange();
       }
@@ -59,10 +58,8 @@ export function TransactionItem({
     <div className="flex items-center justify-between py-2 text-sm">
       <div className="flex items-center gap-4">
         <div className="min-w-[220px] flex items-center gap-2">
-          <span className="text-gray-500">
-            {format(parseISO(date), 'PPP')}
-          </span>
-          <button 
+          <span className="text-gray-500">{format(parseISO(date), 'PPP')}</span>
+          <button
             onClick={() => setIsEditing(!isEditing)}
             className="p-1 hover:bg-gray-100 rounded"
           >
@@ -84,18 +81,12 @@ export function TransactionItem({
           )}
         </div>
         <div>
-          <span className="font-medium text-gray-900">
-            {description}
-          </span>
+          <span className="font-medium text-gray-900">{description}</span>
           {categoryName && (
-            <span className="text-gray-500 ml-2">
-              • {categoryName}
-            </span>
+            <span className="text-gray-500 ml-2">• {categoryName}</span>
           )}
           {allocationName && (
-            <span className="text-purple-600 ml-2">
-              • {allocationName}
-            </span>
+            <span className="text-purple-600 ml-2">• {allocationName}</span>
           )}
         </div>
       </div>
