@@ -1,9 +1,9 @@
-import { supabase } from "../lib/supabase";
-import { Budget, Category, CategoryAllocation } from "../types/budget";
+import { supabase } from '../lib/supabase';
+import { Budget, Category, CategoryAllocation } from '../types/budget';
 
 export interface BudgetUser {
   user_id: string;
-  role: "owner" | "member";
+  role: 'owner' | 'member';
   profiles: {
     email: string;
     name: string | null;
@@ -13,7 +13,7 @@ export interface BudgetUser {
 
 export async function fetchUserBudgets(userId: string): Promise<Budget[]> {
   const { data, error } = await supabase
-    .from("budgets")
+    .from('budgets')
     .select(
       `
       id,
@@ -21,32 +21,34 @@ export async function fetchUserBudgets(userId: string): Promise<Budget[]> {
       budget_users!inner(user_id)
     `
     )
-    .eq("budget_users.user_id", userId);
+    .eq('budget_users.user_id', userId);
 
   if (error) throw error;
   return data || [];
 }
 
 export async function createBudget(name: string): Promise<void> {
-  const { error } = await supabase.from("budgets").insert({ name });
+  const { error } = await supabase.from('budgets').insert({ name });
   if (error) throw error;
 }
 
 export async function deleteBudget(budgetId: string): Promise<void> {
-  const { error } = await supabase.from("budgets").delete().eq("id", budgetId);
+  const { error } = await supabase.from('budgets').delete().eq('id', budgetId);
   if (error) throw error;
 }
 
-export async function fetchBudgetUsers(budgetId: string): Promise<BudgetUser[]> {
+export async function fetchBudgetUsers(
+  budgetId: string
+): Promise<BudgetUser[]> {
   const { data, error } = await supabase
-    .from("budget_users")
+    .from('budget_users')
     .select(
       `
       user_id,
       role
     `
     )
-    .eq("budget_id", budgetId);
+    .eq('budget_id', budgetId);
 
   if (error) throw error;
 
@@ -54,9 +56,9 @@ export async function fetchBudgetUsers(budgetId: string): Promise<BudgetUser[]> 
     const userIds = data.map((user) => user.user_id);
 
     const { data: profilesData, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id, email, name, avatar_url")
-      .in("id", userIds);
+      .from('profiles')
+      .select('id, email, name, avatar_url')
+      .in('id', userIds);
 
     if (profilesError) throw profilesError;
 
@@ -83,18 +85,18 @@ export async function shareBudgetWithUser(
   email: string
 ): Promise<void> {
   const { data: userData, error: userError } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", email)
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
     .single();
 
   if (userError) throw userError;
-  if (!userData) throw new Error("User not found");
+  if (!userData) throw new Error('User not found');
 
-  const { error: shareError } = await supabase.from("budget_users").insert({
+  const { error: shareError } = await supabase.from('budget_users').insert({
     budget_id: budgetId,
     user_id: userData.id,
-    role: "member",
+    role: 'member',
   });
 
   if (shareError) throw shareError;
@@ -102,19 +104,20 @@ export async function shareBudgetWithUser(
 
 export async function fetchCategories(budgetId: string): Promise<Category[]> {
   const { data: categoriesData, error: categoriesError } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("budget_id", budgetId)
-    .order("created_at", { ascending: false });
+    .from('categories')
+    .select('*')
+    .eq('budget_id', budgetId)
+    .order('created_at', { ascending: false });
 
   if (categoriesError) throw categoriesError;
-  
+
   const categoriesWithSpending = await Promise.all(
     (categoriesData || []).map(async (category) => {
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from("transactions")
-        .select("amount")
-        .eq("category_id", category.id);
+      const { data: transactionsData, error: transactionsError } =
+        await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('category_id', category.id);
 
       if (transactionsError) throw transactionsError;
 
@@ -126,10 +129,11 @@ export async function fetchCategories(budgetId: string): Promise<Category[]> {
       // Fetch allocations for shared income categories
       let allocations: CategoryAllocation[] = [];
       if (category.type === 'shared_income') {
-        const { data: allocationsData, error: allocationsError } = await supabase
-          .from("category_allocations")
-          .select("*")
-          .eq("category_id", category.id);
+        const { data: allocationsData, error: allocationsError } =
+          await supabase
+            .from('category_allocations')
+            .select('*')
+            .eq('category_id', category.id);
 
         if (allocationsError) throw allocationsError;
         allocations = allocationsData || [];
@@ -151,9 +155,9 @@ export async function createCategory(
   userId: string,
   name: string,
   amount: number,
-  timeframe: "weekly" | "biweekly" | "monthly" | "yearly",
-  type: "spending" | "income" | "shared_income",
-  amount_type: "fixed" | "flexible",
+  timeframe: 'weekly' | 'biweekly' | 'monthly' | 'yearly',
+  type: 'spending' | 'income' | 'shared_income',
+  amount_type: 'fixed' | 'flexible',
   allocations?: {
     name: string;
     percentage: number;
@@ -167,16 +171,16 @@ export async function createCategory(
   // First, create the category
   console.log('', {
     budgetId,
-  userId,
-  name,
-  amount,
-  timeframe,
-  type,
-  amount_type,
-  allocations
+    userId,
+    name,
+    amount,
+    timeframe,
+    type,
+    amount_type,
+    allocations,
   });
   const { data: category, error: categoryError } = await supabase
-    .from("categories")
+    .from('categories')
     .insert({
       budget_id: budgetId,
       user_id: userId,
@@ -189,20 +193,23 @@ export async function createCategory(
     .select()
     .single();
 
-console.log('allocations', allocations);
-  
+  console.log('allocations', allocations);
+
   if (categoryError) throw categoryError;
   // If this is a shared income category and we have allocations, create them
   if (type === 'shared_income' && allocations?.length && category) {
-    const allocationRecords = allocations.map(allocation => ({
+    const allocationRecords = allocations.map((allocation) => ({
+      name: allocation.name,
       category_id: category.id,
       allocation_type: allocation.isManual ? 'manual' : 'dynamic',
       percentage: allocation.isManual ? allocation.percentage : null,
-      reference_category_id: allocation.isManual ? null : allocation.referenceCategory?.id
+      reference_category_id: allocation.isManual
+        ? null
+        : allocation.referenceCategory?.id,
     }));
-console.log('allocationRecords', allocationRecords);
+    console.log('allocationRecords', allocationRecords);
     const { error: allocationsError } = await supabase
-      .from("category_allocations")
+      .from('category_allocations')
       .insert(allocationRecords);
 
     if (allocationsError) throw allocationsError;
@@ -211,8 +218,8 @@ console.log('allocationRecords', allocationRecords);
 
 export async function deleteCategory(categoryId: string): Promise<void> {
   const { error } = await supabase
-    .from("categories")
+    .from('categories')
     .delete()
-    .eq("id", categoryId);
+    .eq('id', categoryId);
   if (error) throw error;
 }

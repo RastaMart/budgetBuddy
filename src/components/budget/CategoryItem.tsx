@@ -8,6 +8,8 @@ import { AddTransactionForm } from '../transaction/AddTransactionForm';
 import { TransactionItem } from '../transaction/TransactionItem';
 import { useAuth } from '../../hooks/useContext';
 import { supabase } from '../../lib/supabase';
+import { formatAllocation } from '../../utils/formatAllocation';
+import { calculateDynamicAllocations } from '../../utils/calculateDynamicAllocations';
 
 interface Transaction {
   id: string;
@@ -73,82 +75,14 @@ export function CategoryItem({
 
       if (!allocations?.length) return;
 
-      const stats = await Promise.all(
-        allocations.map(async (allocation) => {
-          let name = '';
-          let percentage = 0;
-          let reference_total = 0;
-
-          if (
-            allocation.allocation_type === 'dynamic' &&
-            allocation.reference_category_id
-          ) {
-            // Fetch reference category details
-            const {
-              data: refCategory,
-            }: { data: { name: string; budget: { name: string } } | null } =
-              await supabase
-                .from('categories')
-                .select('name, budget:budgets(name)')
-                .eq('id', allocation.reference_category_id)
-                .single();
-
-            if (refCategory) {
-              name = `${refCategory.budget.name} - ${refCategory.name}`;
-
-              // Get reference category transactions
-              const { data: refTransactions } = await supabase
-                .from('transactions')
-                .select('amount')
-                .eq('category_id', allocation.reference_category_id);
-
-              reference_total = (refTransactions || []).reduce(
-                (sum, t) => sum + (t.amount || 0),
-                0
-              );
-            }
-          } else {
-            name = `Manual Allocation`;
-            percentage = allocation.percentage || 0;
-          }
-
-          // Calculate total spent for this allocation
-          const { data: allocationTransactions } = await supabase
-            .from('transactions')
-            .select('amount')
-            .eq('category_id', category.id)
-            .eq('allocation_id', allocation.id);
-
-          const total_spent = (allocationTransactions || []).reduce(
-            (sum, t) => sum + (t.amount || 0),
-            0
-          );
-
-          return {
-            id: allocation.id,
-            name,
-            percentage,
-            amount: category.amount ? (category.amount * percentage) / 100 : 0,
-            total_spent,
-            reference_total:
-              allocation.allocation_type === 'dynamic'
-                ? reference_total
-                : undefined,
-          };
-        })
+      // Use the utility function to calculate allocations
+      const calculatedStats = await calculateDynamicAllocations(
+        allocations,
+        category.id,
+        category.amount
       );
 
-      // Calculate dynamic percentages based on total spending
-      const totalSpent = stats.reduce((sum, stat) => sum + stat.total_spent, 0);
-
-      const updatedStats = stats.map((stat) => ({
-        ...stat,
-        percentage:
-          stat.percentage ||
-          (totalSpent > 0 ? (stat.total_spent / totalSpent) * 100 : 0),
-      }));
-
-      setAllocationStats(updatedStats);
+      setAllocationStats(calculatedStats);
     } catch (error) {
       console.error('Error calculating allocation stats:', error);
     }
@@ -276,36 +210,34 @@ export function CategoryItem({
 
         {category.type === 'shared_income' && allocationStats.length > 0 && (
           <div className="space-y-4">
-            {allocationStats.map((allocation) => (
-              <div key={allocation.id} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">
-                      {allocation.name}
-                    </span>
-                    {allocation.reference_total !== undefined && (
-                      <span className="text-sm text-gray-500">
-                        (${allocation.reference_total.toFixed(2)})
+            {allocationStats.map((allocation) => {
+              return (
+                <div key={allocation.id} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">
+                        {allocation.name}
                       </span>
-                    )}
+                      {allocation.reference_total !== undefined && (
+                        <span className="text-sm text-gray-500">
+                          {/* (${allocation.reference_total.toFixed(2)}) */}
+                          {formatAllocation(
+                            allocation.percentage,
+                            category.amount.toFixed(2)
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {allocation.percentage.toFixed(1)}%
-                    {category.amount > 0 && (
-                      <span className="ml-2">
-                        • ${allocation.amount.toFixed(2)}
-                      </span>
-                    )}
-                  </div>
+                  <ProgressBar
+                    spentPercentage={
+                      (allocation.total_spent / (allocation.amount || 1)) * 100
+                    }
+                    timeProgress={timeProgress}
+                  />
                 </div>
-                <ProgressBar
-                  spentPercentage={
-                    (allocation.total_spent / (allocation.amount || 1)) * 100
-                  }
-                  timeProgress={timeProgress}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

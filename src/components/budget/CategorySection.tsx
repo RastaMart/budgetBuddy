@@ -9,23 +9,30 @@ interface BudgetSectionProps {
   onTransactionAdded: () => void;
 }
 
-export function CategorySection({ categories, timeframe, onDelete, onTransactionAdded }: BudgetSectionProps) {
-  const filteredCategories = categories.filter(category => category.timeframe === timeframe);
+export function CategorySection({
+  categories,
+  timeframe,
+  onDelete,
+  onTransactionAdded,
+}: BudgetSectionProps) {
+  const filteredCategories = categories.filter(
+    (category) => category.timeframe === timeframe
+  );
   if (filteredCategories.length === 0) return null;
 
   // Separate categories by type
   const incomeCategories = filteredCategories.filter(
-    cat => cat.type === 'income' || cat.type === 'shared_income'
+    (cat) => cat.type === 'income' || cat.type === 'shared_income'
   );
   const spendingCategories = filteredCategories.filter(
-    cat => cat.type === 'spending'
+    (cat) => cat.type === 'spending'
   );
 
   const timeframeLabels = {
     weekly: 'Weekly Budgets',
     biweekly: 'Bi-Weekly Budgets',
     monthly: 'Monthly Budgets',
-    yearly: 'Yearly Budgets'
+    yearly: 'Yearly Budgets',
   };
 
   return (
@@ -38,16 +45,18 @@ export function CategorySection({ categories, timeframe, onDelete, onTransaction
       <div className="divide-y divide-gray-200">
         {/* Income Categories */}
         {incomeCategories.length > 0 && (
-          <div className="bg-green-50">
-            <div className="px-6 py-2 bg-green-100">
-              <h3 className="text-sm font-medium text-green-800">Income Categories</h3>
+          <div>
+            <div className="px-6 py-2 bg-gray-100">
+              <h3 className="text-sm font-medium text-gray-700">
+                Income Categories
+              </h3>
             </div>
-            <div className="divide-y divide-green-100">
+            <div className="divide-y divide-gray-100">
               {incomeCategories.map((category) => (
                 <CategoryItem
                   key={category.id}
                   category={category}
-                  timeframe={timeframe}
+                  // timeframe={timeframe}
                   onDelete={onDelete}
                   onTransactionAdded={onTransactionAdded}
                 />
@@ -60,14 +69,16 @@ export function CategorySection({ categories, timeframe, onDelete, onTransaction
         {spendingCategories.length > 0 && (
           <div>
             <div className="px-6 py-2 bg-gray-100">
-              <h3 className="text-sm font-medium text-gray-700">Spending Categories</h3>
+              <h3 className="text-sm font-medium text-gray-700">
+                Spending Categories
+              </h3>
             </div>
             <div className="divide-y divide-gray-100">
               {spendingCategories.map((category) => (
                 <CategoryItem
                   key={category.id}
                   category={category}
-                  timeframe={timeframe}
+                  // timeframe={timeframe}
                   onDelete={onDelete}
                   onTransactionAdded={onTransactionAdded}
                 />

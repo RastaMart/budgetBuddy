@@ -259,8 +259,8 @@ export function Budgets() {
               {/* Income Categories Section */}
               {incomeCategories.length > 0 && (
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <div className="bg-green-50 px-6 py-3 border-b border-green-100">
-                    <h2 className="text-xl font-medium text-green-800">
+                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                    <h2 className="text-xl font-medium text-gray-900">
                       Income Categories
                     </h2>
                   </div>
@@ -273,8 +273,8 @@ export function Budgets() {
 
                       return (
                         <div key={timeframe}>
-                          <div className="px-6 py-2 bg-green-50">
-                            <h3 className="text-sm font-medium text-green-700">
+                          <div className="px-6 py-2 bg-gray-50">
+                            <h3 className="text-sm font-medium text-gray-700">
                               {timeframeLabels[timeframe]}
                             </h3>
                           </div>

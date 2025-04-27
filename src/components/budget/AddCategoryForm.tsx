@@ -15,6 +15,7 @@ import {
 } from 'date-fns';
 import { SharedIncomeAllocation } from '../../types/category';
 import { Budget } from '../../types/budget';
+import { formatAllocation } from '../../utils/formatAllocation';
 
 interface FormData {
   name: string;
@@ -493,58 +494,65 @@ export function AddCategoryForm({
             </div>
           </div>
 
-          {(formData.allocations || []).map((allocation, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg"
-            >
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">{allocation.name}</p>
-                  <div className="text-right">
-                    {allocation.transactionTotal !== undefined && (
-                      <p className="text-sm text-gray-600">
-                        ${allocation.transactionTotal.toFixed(2)}
-                        {totalTransactions > 0 && (
-                          <span className="ml-2 text-gray-500">
-                            (
-                            {(
-                              (allocation.transactionTotal /
-                                totalTransactions) *
-                              100
-                            ).toFixed(1)}
-                            %)
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    {formData.amount && parseFloat(formData.amount) > 0 && (
-                      <p className="text-xs text-gray-500">
-                        Target: $
-                        {(
-                          (parseFloat(formData.amount) *
-                            (allocation.percentage || 0)) /
-                          100
-                        ).toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500">
-                  {formData.allocation_type === 'manual'
-                    ? `${allocation.percentage}%`
-                    : 'Dynamic'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleRemoveAllocation(index)}
-                className="text-red-600 hover:text-red-800"
+          {(formData.allocations || []).map((allocation, index) => {
+            const percentage =
+              formData.allocation_type === 'manual'
+                ? allocation.percentage.toFixed(1)
+                : (
+                    ((allocation.transactionTotal || 0) / totalTransactions) *
+                    100
+                  ).toFixed(1);
+            return (
+              <div
+                key={index}
+                className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg"
               >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">
+                      {allocation.name}
+                      {allocation.transactionTotal !== undefined && (
+                        <span className="text-sm text-gray-500">
+                          {' '}
+                          {' ($'}
+                          {allocation.transactionTotal.toFixed(2)}
+                          {')'}
+                        </span>
+                      )}
+                    </p>
+                    <div className="text-right">
+                      {allocation.transactionTotal !== undefined && (
+                        <>
+                          {}
+                          <p className="text-sm text-gray-600">
+                            {totalTransactions > 0 && (
+                              <span className="ml-2 text-gray-500">
+                                ({percentage}
+                                %)
+                              </span>
+                            )}
+                          </p>
+                        </>
+                      )}
+                      {formData.amount && parseFloat(formData.amount) > 0 && (
+                        <p className="text-lg text-gray-500"></p>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {formatAllocation(percentage, formData.amount)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveAllocation(index)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
             {formData.allocation_type === 'manual' ? (
