@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Plus, MoreVertical, Trash2 } from "lucide-react";
+import { Plus, MoreVertical, Trash2, Settings } from "lucide-react";
 import { BudgetUser } from "../../services/budgetService";
 import { Avatar } from "../ui/Avatar";
 
@@ -7,9 +7,10 @@ interface BudgetHeaderProps {
   users: BudgetUser[];
   onShare: () => void;
   onDelete: () => void;
+  onEditAllocations: () => void;
 }
 
-export function BudgetHeader({ users, onShare, onDelete }: BudgetHeaderProps) {
+export function BudgetHeader({ users, onShare, onDelete, onEditAllocations }: BudgetHeaderProps) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +65,16 @@ export function BudgetHeader({ users, onShare, onDelete }: BudgetHeaderProps) {
           {/* Dropdown Menu */}
           {showMenu && (
             <div className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg z-10 py-1">
+              <button
+                onClick={() => {
+                  onEditAllocations();
+                  setShowMenu(false);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Edit Allocations
+              </button>
               <button
                 onClick={() => {
                   onDelete();

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useContext';
 import { Plus } from 'lucide-react';
 import { Budget } from '../types/budget';
@@ -10,7 +11,9 @@ import { BudgetHeader } from '../components/budget/BudgetHeader';
 import { NewBudgetForm } from '../components/budget/NewBudgetForm';
 import { ShareBudgetModal } from '../components/budget/ShareBudgetModal';
 import { DeleteBudgetModal } from '../components/budget/DeleteBudgetModal';
+import { EditAllocationsModal } from '../components/budget/EditAllocationsModal';
 import { Modal } from '../components/shared/Modal';
+import { supabase } from '../lib/supabase';
 import {
   BudgetUser,
   fetchUserBudgets,
@@ -21,10 +24,13 @@ import {
   fetchCategories,
   createCategory,
   deleteCategory,
+  updateBudgetOrder,
 } from '../services/budgetService';
 
 export function Budgets() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { budgetId } = useParams();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [selectedBudget, setSelectedBudget] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -33,22 +39,31 @@ export function Budgets() {
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>(
-    {}
-  );
+  const [showEditAllocationsModal, setShowEditAllocationsModal] = useState(false);
+  const [budgetUsers, setBudgetUsers] = useState<Record<string, BudgetUser[]>>({});
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
     timeframe: 'monthly' as 'weekly' | 'biweekly' | 'monthly' | 'yearly',
     type: 'spending' as 'spending' | 'income' | 'shared_income',
     amount_type: 'fixed' as 'fixed' | 'flexible',
-    allocations: [],
-    allocation_type: 'manual' as 'manual' | 'dynamic',
   });
 
   useEffect(() => {
     fetchUserBudgetsData();
   }, []);
+
+  useEffect(() => {
+    if (budgets.length > 0) {
+      if (budgetId && budgets.some(b => b.id === budgetId)) {
+        setSelectedBudget(budgetId);
+      } else {
+        const firstBudgetId = budgets[0].id;
+        setSelectedBudget(firstBudgetId);
+        navigate(`/budgets/${firstBudgetId}`, { replace: true });
+      }
+    }
+  }, [budgets, budgetId, navigate]);
 
   useEffect(() => {
     if (selectedBudget) {
@@ -65,12 +80,27 @@ export function Budgets() {
     yearly: 'Yearly',
   };
 
-  // Separate income and spending categories
   const incomeCategories = categories.filter(
     (cat) => cat.type === 'income' || cat.type === 'shared_income'
   );
   const spendingCategories = categories.filter(
     (cat) => cat.type === 'spending'
+  );
+
+  const incomeTotals = incomeCategories.reduce(
+    (acc, cat) => ({
+      budgeted: acc.budgeted + cat.amount,
+      actual: acc.actual + (cat.total_spent || 0),
+    }),
+    { budgeted: 0, actual: 0 }
+  );
+
+  const spendingTotals = spendingCategories.reduce(
+    (acc, cat) => ({
+      budgeted: acc.budgeted + cat.amount,
+      actual: acc.actual + (cat.total_spent || 0),
+    }),
+    { budgeted: 0, actual: 0 }
   );
 
   async function fetchUserBudgetsData() {
@@ -81,10 +111,6 @@ export function Budgets() {
       const data = await fetchUserBudgets(user.id);
       setBudgets(data);
 
-      if (data.length > 0 && !selectedBudget) {
-        setSelectedBudget(data[0].id);
-      }
-
       await Promise.all(
         data?.map((budget) => fetchBudgetUsersData(budget.id)) || []
       );
@@ -92,6 +118,21 @@ export function Budgets() {
       console.error('Error fetching budgets:', error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleBudgetSelect(budgetId: string) {
+    setSelectedBudget(budgetId);
+    navigate(`/budgets/${budgetId}`, { replace: true });
+  }
+
+  async function handleReorderBudgets(newBudgets: Budget[]) {
+    setBudgets(newBudgets);
+    try {
+      await updateBudgetOrder(newBudgets);
+    } catch (error) {
+      console.error('Error saving budget order:', error);
+      fetchUserBudgetsData();
     }
   }
 
@@ -150,8 +191,7 @@ export function Budgets() {
         parseFloat(formData.amount),
         formData.timeframe,
         formData.type,
-        formData.amount_type,
-        formData.type === 'shared_income' ? formData.allocations : undefined
+        formData.amount_type
       );
 
       setFormData({
@@ -159,9 +199,7 @@ export function Budgets() {
         amount: '',
         timeframe: 'monthly',
         type: 'spending',
-        amount_type: 'fixed',
-        allocations: [],
-        allocation_type: 'manual',
+        amount_type: 'fixed'
       });
       setShowNewCategoryModal(false);
       fetchCategoriesData();
@@ -204,6 +242,10 @@ export function Budgets() {
     }
   }
 
+  function handleEditAllocations() {
+    setShowEditAllocationsModal(true);
+  }
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -225,15 +267,17 @@ export function Budgets() {
         budgets={budgets}
         selectedBudget={selectedBudget}
         budgetUsers={budgetUsers}
-        onSelectBudget={setSelectedBudget}
+        onSelectBudget={handleBudgetSelect}
         onNewBudget={() => setShowNewBudgetModal(true)}
+        onReorderBudgets={handleReorderBudgets}
       />
 
       {selectedBudget && (
         <BudgetHeader
           users={selectedBudgetUsers}
           onShare={() => setShowShareModal(true)}
-          onDelete={() => setShowDeleteModal(true)}
+          onDelete={() => setShowDeleteModal(false)}
+          onEditAllocations={handleEditAllocations}
         />
       )}
 
@@ -260,9 +304,19 @@ export function Budgets() {
               {incomeCategories.length > 0 && (
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                   <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                    <h2 className="text-xl font-medium text-gray-900">
-                      Income Categories
-                    </h2>
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-xl font-medium text-gray-900">
+                        Income Categories
+                      </h2>
+                      <div className="text-sm text-gray-600">
+                        <span className="mr-4">
+                          Budgeted: ${incomeTotals.budgeted.toFixed(2)}
+                        </span>
+                        <span>
+                          Actual: ${incomeTotals.actual.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <div className="divide-y divide-gray-200">
                     {timeframes.map((timeframe) => {
@@ -283,7 +337,6 @@ export function Budgets() {
                               <CategoryItem
                                 key={category.id}
                                 category={category}
-                                // timeframe={timeframe}
                                 onDelete={handleDeleteCategorySubmit}
                                 onTransactionAdded={fetchCategoriesData}
                               />
@@ -300,9 +353,19 @@ export function Budgets() {
               {spendingCategories.length > 0 && (
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                   <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                    <h2 className="text-xl font-medium text-gray-900">
-                      Spending Categories
-                    </h2>
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-xl font-medium text-gray-900">
+                        Spending Categories
+                      </h2>
+                      <div className="text-sm text-gray-600">
+                        <span className="mr-4">
+                          Budgeted: ${spendingTotals.budgeted.toFixed(2)}
+                        </span>
+                        <span>
+                          Actual: ${spendingTotals.actual.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <div className="divide-y divide-gray-200">
                     {timeframes.map((timeframe) => {
@@ -323,7 +386,6 @@ export function Budgets() {
                               <CategoryItem
                                 key={category.id}
                                 category={category}
-                                // timeframe={timeframe}
                                 onDelete={handleDeleteCategorySubmit}
                                 onTransactionAdded={fetchCategoriesData}
                               />
@@ -362,6 +424,8 @@ export function Budgets() {
           formData={formData}
           onSubmit={handleCreateCategorySubmit}
           onChange={(data) => setFormData({ ...formData, ...data })}
+          budgetId={selectedBudget || ''}
+          onSuccess={fetchCategoriesData}
         />
       </Modal>
 
@@ -376,6 +440,13 @@ export function Budgets() {
         onClose={() => setShowDeleteModal(false)}
         onDelete={handleDeleteBudgetSubmit}
         budgetName={currentBudget?.name || ''}
+      />
+
+      <EditAllocationsModal
+        isOpen={showEditAllocationsModal}
+        onClose={() => setShowEditAllocationsModal(false)}
+        budgetId={selectedBudget || ''}
+        onSave={fetchCategoriesData}
       />
     </div>
   );

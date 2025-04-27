@@ -18,17 +18,46 @@ export async function fetchUserBudgets(userId: string): Promise<Budget[]> {
       `
       id,
       name,
+      display_order,
       budget_users!inner(user_id)
     `
     )
-    .eq('budget_users.user_id', userId);
+    .eq('budget_users.user_id', userId)
+    .order('display_order');
 
   if (error) throw error;
   return data || [];
 }
 
+export async function updateBudgetOrder(budgets: Budget[]): Promise<void> {
+  const updates = budgets.map((budget, index) => ({
+    id: budget.id,
+    name: budget.name,
+    display_order: index,
+  }));
+
+  const { error } = await supabase
+    .from('budgets')
+    .upsert(updates, { onConflict: 'id' });
+
+  if (error) throw error;
+}
+
 export async function createBudget(name: string): Promise<void> {
-  const { error } = await supabase.from('budgets').insert({ name });
+  // Get the highest display_order
+  const { data: maxOrder } = await supabase
+    .from('budgets')
+    .select('display_order')
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextOrder = (maxOrder?.display_order ?? -1) + 1;
+
+  const { error } = await supabase
+    .from('budgets')
+    .insert({ name, display_order: nextOrder });
+
   if (error) throw error;
 }
 
@@ -126,23 +155,9 @@ export async function fetchCategories(budgetId: string): Promise<Category[]> {
         0
       );
 
-      // Fetch allocations for shared income categories
-      let allocations: CategoryAllocation[] = [];
-      if (category.type === 'shared_income') {
-        const { data: allocationsData, error: allocationsError } =
-          await supabase
-            .from('category_allocations')
-            .select('*')
-            .eq('category_id', category.id);
-
-        if (allocationsError) throw allocationsError;
-        allocations = allocationsData || [];
-      }
-
       return {
         ...category,
         total_spent: totalSpent,
-        allocations,
       };
     })
   );
@@ -157,63 +172,75 @@ export async function createCategory(
   amount: number,
   timeframe: 'weekly' | 'biweekly' | 'monthly' | 'yearly',
   type: 'spending' | 'income' | 'shared_income',
-  amount_type: 'fixed' | 'flexible',
-  allocations?: {
-    name: string;
-    percentage: number;
-    isManual: boolean;
-    referenceCategory?: {
-      id: string;
-      budget_id: string;
-    };
-  }[]
+  amount_type: 'fixed' | 'flexible'
 ): Promise<void> {
-  // First, create the category
-  console.log('', {
-    budgetId,
-    userId,
-    name,
-    amount,
-    timeframe,
-    type,
-    amount_type,
-    allocations,
-  });
-  const { data: category, error: categoryError } = await supabase
-    .from('categories')
-    .insert({
+  if (type === 'shared_income') {
+    // Fetch budget allocations
+    const { data: allocations, error: allocationsError } = await supabase
+      .from('budget_allocations')
+      .select('*')
+      .eq('budget_id', budgetId);
+
+    if (allocationsError) throw allocationsError;
+
+    // Calculate dynamic percentages
+    const dynamicAllocations = allocations.filter(a => a.allocation_type === 'dynamic');
+    if (dynamicAllocations.length > 0) {
+      const totalDynamicAmount = await calculateTotalDynamicAmount(dynamicAllocations);
+      
+      for (const allocation of dynamicAllocations) {
+        const referenceAmount = await getReferenceAmount(allocation.reference_category_id);
+        allocation.percentage = totalDynamicAmount > 0 
+          ? (referenceAmount / totalDynamicAmount) * 100 
+          : 0;
+      }
+    }
+
+    // Create a category for each allocation
+    for (const allocation of allocations) {
+      await supabase.from('categories').insert({
+        budget_id: budgetId,
+        user_id: userId,
+        name: `${name} - ${allocation.name}`,
+        amount: amount * (allocation.percentage / 100),
+        timeframe,
+        type,
+        amount_type,
+        shared_amount: amount,
+        allocation_id: allocation.id
+      });
+    }
+  } else {
+    // Create a single category for non-shared types
+    await supabase.from('categories').insert({
       budget_id: budgetId,
       user_id: userId,
       name,
-      amount: amount_type === 'fixed' ? amount : 0,
+      amount,
       timeframe,
       type,
-      amount_type,
-    })
-    .select()
-    .single();
-
-  console.log('allocations', allocations);
-
-  if (categoryError) throw categoryError;
-  // If this is a shared income category and we have allocations, create them
-  if (type === 'shared_income' && allocations?.length && category) {
-    const allocationRecords = allocations.map((allocation) => ({
-      name: allocation.name,
-      category_id: category.id,
-      allocation_type: allocation.isManual ? 'manual' : 'dynamic',
-      percentage: allocation.isManual ? allocation.percentage : null,
-      reference_category_id: allocation.isManual
-        ? null
-        : allocation.referenceCategory?.id,
-    }));
-    console.log('allocationRecords', allocationRecords);
-    const { error: allocationsError } = await supabase
-      .from('category_allocations')
-      .insert(allocationRecords);
-
-    if (allocationsError) throw allocationsError;
+      amount_type
+    });
   }
+}
+
+async function calculateTotalDynamicAmount(allocations: any[]): Promise<number> {
+  let total = 0;
+  for (const allocation of allocations) {
+    if (allocation.reference_category_id) {
+      total += await getReferenceAmount(allocation.reference_category_id);
+    }
+  }
+  return total;
+}
+
+async function getReferenceAmount(categoryId: string): Promise<number> {
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('category_id', categoryId);
+
+  return (transactions || []).reduce((sum, t) => sum + (t.amount || 0), 0);
 }
 
 export async function deleteCategory(categoryId: string): Promise<void> {
