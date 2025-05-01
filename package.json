@@ -14,7 +14,8 @@
     "type-check": "tsc --noEmit",
     "bump:patch": "node scripts/bump-version.js patch",
     "bump:minor": "node scripts/bump-version.js minor",
-    "bump:major": "node scripts/bump-version.js major"
+    "bump:major": "node scripts/bump-version.js major",
+    "prodData": "supabase db dump -f supabase/seed.sql --data-only"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
