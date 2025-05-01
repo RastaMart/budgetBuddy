@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../hooks/useContext";
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useContext';
+import { VERSION } from '../../src/version'; // Adjust the import path as necessary
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -11,15 +12,15 @@ export function Dashboard() {
     async function checkSupabaseConnection() {
       try {
         const { count, error } = await supabase
-          .from("categories")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id);
+          .from('categories')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
 
         if (error) throw error;
         setCategoryCount(count);
       } catch (err) {
-        console.error("Error:", err);
-        setError(err instanceof Error ? err.message : "An error occurred");
+        console.error('Error:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
       }
     }
 
@@ -40,10 +41,11 @@ export function Dashboard() {
           <div className="space-y-2">
             <p className="text-green-600">✓ Supabase connection successful!</p>
             <p className="text-gray-600">
-              You have {categoryCount === null ? "..." : categoryCount}{" "}
-              {categoryCount === 1 ? "category" : "categories"} in your account.
+              You have {categoryCount === null ? '...' : categoryCount}{' '}
+              {categoryCount === 1 ? 'category' : 'categories'} in your account.
             </p>
             <p className="text-gray-600">User ID: {user.id}</p>
+            <p className="text-xs text-gray-400 mt-2">v{VERSION}</p>
           </div>
         )}
       </div>
