@@ -1,6 +1,6 @@
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../../lib/supabase";
-import { useAuth } from "../../hooks/useContext";
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useContext';
 
 export function Callback() {
   const navigate = useNavigate();
@@ -15,9 +15,9 @@ export function Callback() {
         await createOrFetchProfile(session.user);
       }
     } catch (error) {
-      console.error("Session check error:", error);
+      console.error('Session check error:', error);
     } finally {
-      navigate("/");
+      navigate('/');
     }
   }
   initialSession();
