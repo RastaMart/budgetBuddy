@@ -1,9 +1,23 @@
+create table "public"."budget_allocations" (
+    "id" uuid not null default gen_random_uuid(),
+    "budget_id" uuid not null,
+    "name" text not null,
+    "allocation_type" text not null,
+    "percentage" numeric(5,2),
+    "reference_category_id" uuid,
+    "created_at" timestamp with time zone default now(),
+    "updated_at" timestamp with time zone default now()
+);
+
+
+alter table "public"."budget_allocations" enable row level security;
+
 create table "public"."budget_users" (
     "budget_id" uuid not null,
     "user_id" uuid not null default auth.uid(),
     "role" text not null,
     "created_at" timestamp with time zone default now(),
-    "profile_id" uuid not null
+    "profile_id" uuid not null default auth.uid()
 );
 
 
@@ -13,7 +27,8 @@ create table "public"."budgets" (
     "id" uuid not null default gen_random_uuid(),
     "name" text not null,
     "created_at" timestamp with time zone default now(),
-    "updated_at" timestamp with time zone default now()
+    "updated_at" timestamp with time zone default now(),
+    "display_order" integer not null
 );
 
 
@@ -27,14 +42,18 @@ create table "public"."categories" (
     "timeframe" text not null,
     "created_at" timestamp with time zone default now(),
     "updated_at" timestamp with time zone default now(),
-    "budget_id" uuid
+    "budget_id" uuid,
+    "type" text not null default 'spending'::text,
+    "amount_type" text not null default 'fixed'::text,
+    "shared_amount" numeric(10,2),
+    "allocation_id" uuid
 );
 
 
 alter table "public"."categories" enable row level security;
 
 create table "public"."profiles" (
-    "user_id" uuid not null,
+    "user_id" uuid not null default auth.uid(),
     "email" text not null,
     "name" text,
     "avatar_url" text,
@@ -62,6 +81,8 @@ create table "public"."transactions" (
 
 alter table "public"."transactions" enable row level security;
 
+CREATE UNIQUE INDEX budget_allocations_pkey ON public.budget_allocations USING btree (id);
+
 CREATE UNIQUE INDEX budget_users_pkey ON public.budget_users USING btree (budget_id, profile_id);
 
 CREATE UNIQUE INDEX budgets_pkey ON public.budgets USING btree (id);
@@ -69,6 +90,8 @@ CREATE UNIQUE INDEX budgets_pkey ON public.budgets USING btree (id);
 CREATE UNIQUE INDEX categories_pkey ON public.categories USING btree (id);
 
 CREATE INDEX idx_budget_users_user_id ON public.budget_users USING btree (user_id);
+
+CREATE INDEX idx_budgets_display_order ON public.budgets USING btree (display_order);
 
 CREATE INDEX idx_categories_budget_id ON public.categories USING btree (budget_id);
 
@@ -86,6 +109,8 @@ CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id);
 
 CREATE UNIQUE INDEX transactions_pkey ON public.transactions USING btree (id);
 
+alter table "public"."budget_allocations" add constraint "budget_allocations_pkey" PRIMARY KEY using index "budget_allocations_pkey";
+
 alter table "public"."budget_users" add constraint "budget_users_pkey" PRIMARY KEY using index "budget_users_pkey";
 
 alter table "public"."budgets" add constraint "budgets_pkey" PRIMARY KEY using index "budgets_pkey";
@@ -95,6 +120,22 @@ alter table "public"."categories" add constraint "categories_pkey" PRIMARY KEY u
 alter table "public"."profiles" add constraint "profiles_pkey" PRIMARY KEY using index "profiles_pkey";
 
 alter table "public"."transactions" add constraint "transactions_pkey" PRIMARY KEY using index "transactions_pkey";
+
+alter table "public"."budget_allocations" add constraint "budget_allocations_allocation_type_check" CHECK ((allocation_type = ANY (ARRAY['manual'::text, 'dynamic'::text]))) not valid;
+
+alter table "public"."budget_allocations" validate constraint "budget_allocations_allocation_type_check";
+
+alter table "public"."budget_allocations" add constraint "budget_allocations_budget_id_fkey" FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE not valid;
+
+alter table "public"."budget_allocations" validate constraint "budget_allocations_budget_id_fkey";
+
+alter table "public"."budget_allocations" add constraint "budget_allocations_percentage_check" CHECK (((percentage >= (0)::numeric) AND (percentage <= (100)::numeric))) not valid;
+
+alter table "public"."budget_allocations" validate constraint "budget_allocations_percentage_check";
+
+alter table "public"."budget_allocations" add constraint "budget_allocations_reference_category_id_fkey" FOREIGN KEY (reference_category_id) REFERENCES categories(id) ON DELETE SET NULL not valid;
+
+alter table "public"."budget_allocations" validate constraint "budget_allocations_reference_category_id_fkey";
 
 alter table "public"."budget_users" add constraint "budget_users_auth_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
 
@@ -112,13 +153,25 @@ alter table "public"."budget_users" add constraint "budget_users_role_check" CHE
 
 alter table "public"."budget_users" validate constraint "budget_users_role_check";
 
-alter table "public"."categories" add constraint "budgets_timeframe_check" CHECK ((timeframe = ANY (ARRAY['weekly'::text, 'monthly'::text, 'yearly'::text]))) not valid;
+alter table "public"."categories" add constraint "budgets_timeframe_check" CHECK ((timeframe = ANY (ARRAY['weekly'::text, 'biweekly'::text, 'monthly'::text, 'yearly'::text]))) not valid;
 
 alter table "public"."categories" validate constraint "budgets_timeframe_check";
+
+alter table "public"."categories" add constraint "categories_allocation_id_fkey" FOREIGN KEY (allocation_id) REFERENCES budget_allocations(id) ON DELETE SET NULL not valid;
+
+alter table "public"."categories" validate constraint "categories_allocation_id_fkey";
+
+alter table "public"."categories" add constraint "categories_amount_type_check" CHECK ((amount_type = ANY (ARRAY['fixed'::text, 'flexible'::text]))) not valid;
+
+alter table "public"."categories" validate constraint "categories_amount_type_check";
 
 alter table "public"."categories" add constraint "categories_budget_id_fkey" FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE not valid;
 
 alter table "public"."categories" validate constraint "categories_budget_id_fkey";
+
+alter table "public"."categories" add constraint "categories_type_check" CHECK ((type = ANY (ARRAY['spending'::text, 'income'::text, 'shared_income'::text]))) not valid;
+
+alter table "public"."categories" validate constraint "categories_type_check";
 
 alter table "public"."profiles" add constraint "profiles_id_key" UNIQUE using index "profiles_id_key";
 
@@ -166,6 +219,48 @@ BEGIN
 END;
 $function$
 ;
+
+grant delete on table "public"."budget_allocations" to "anon";
+
+grant insert on table "public"."budget_allocations" to "anon";
+
+grant references on table "public"."budget_allocations" to "anon";
+
+grant select on table "public"."budget_allocations" to "anon";
+
+grant trigger on table "public"."budget_allocations" to "anon";
+
+grant truncate on table "public"."budget_allocations" to "anon";
+
+grant update on table "public"."budget_allocations" to "anon";
+
+grant delete on table "public"."budget_allocations" to "authenticated";
+
+grant insert on table "public"."budget_allocations" to "authenticated";
+
+grant references on table "public"."budget_allocations" to "authenticated";
+
+grant select on table "public"."budget_allocations" to "authenticated";
+
+grant trigger on table "public"."budget_allocations" to "authenticated";
+
+grant truncate on table "public"."budget_allocations" to "authenticated";
+
+grant update on table "public"."budget_allocations" to "authenticated";
+
+grant delete on table "public"."budget_allocations" to "service_role";
+
+grant insert on table "public"."budget_allocations" to "service_role";
+
+grant references on table "public"."budget_allocations" to "service_role";
+
+grant select on table "public"."budget_allocations" to "service_role";
+
+grant trigger on table "public"."budget_allocations" to "service_role";
+
+grant truncate on table "public"."budget_allocations" to "service_role";
+
+grant update on table "public"."budget_allocations" to "service_role";
 
 grant delete on table "public"."budget_users" to "anon";
 
@@ -376,6 +471,16 @@ grant trigger on table "public"."transactions" to "service_role";
 grant truncate on table "public"."transactions" to "service_role";
 
 grant update on table "public"."transactions" to "service_role";
+
+create policy "Users can manage their own budget allocations"
+on "public"."budget_allocations"
+as permissive
+for all
+to authenticated
+using ((budget_id IN ( SELECT budget_users.budget_id
+   FROM budget_users
+  WHERE (budget_users.user_id = auth.uid()))));
+
 
 create policy "Enable insert for authenticated users only"
 on "public"."budget_users"
