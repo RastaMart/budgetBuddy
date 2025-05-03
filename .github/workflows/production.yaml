@@ -22,14 +22,5 @@ jobs:
         with:
           version: latest
 
-      - name: Debug connection info
-        run: |
-          echo "Attempting to connect to Supabase project: $SUPABASE_PROJECT_ID..."
-          echo "Using access token: $SUPABASE_ACCESS_TOKEN..."
-
-      - name: Link project
-        run: |
-          supabase link --project-ref $SUPABASE_PROJECT_ID --password $SUPABASE_DB_PASSWORD
-
-      - name: Push database changes
-        run: supabase db push
+      - run: supabase link --project-ref $SUPABASE_PROJECT_ID
+      - run: supabase db push
