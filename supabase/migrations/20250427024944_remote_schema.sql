@@ -4,8 +4,6 @@ drop trigger if exists "objects_insert_create_prefix" on "storage"."objects";
 
 drop trigger if exists "objects_update_create_prefix" on "storage"."objects";
 
-drop trigger if exists "prefixes_delete_hierarchy" on "storage"."prefixes";
-
 revoke delete on table "storage"."prefixes" from "anon";
 
 revoke insert on table "storage"."prefixes" from "anon";
