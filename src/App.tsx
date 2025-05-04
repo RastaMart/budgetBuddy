@@ -7,6 +7,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Budgets } from "./pages/Budgets";
 import { Transactions } from "./pages/Transactions";
 import { Settings } from "./pages/Settings";
+import { Accounts } from "./pages/Accounts";
 import { Login } from "./pages/auth/Login";
 import { SignUp } from "./pages/auth/SignUp";
 import { Callback } from "./pages/auth/Callback";
@@ -31,6 +32,7 @@ function App() {
             <Route path="budgets" element={<Budgets />} />
             <Route path="budgets/:budgetId" element={<Budgets />} />
             <Route path="transactions" element={<Transactions />} />
+            <Route path="accounts" element={<Accounts />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

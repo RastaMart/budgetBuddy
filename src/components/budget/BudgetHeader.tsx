@@ -36,9 +36,9 @@ export function BudgetHeader({ users, onShare, onDelete, onEditAllocations }: Bu
             {users.map((budgetUser) => (
               <div key={budgetUser.user_id}>
                 <Avatar
-                  avatarUrl={budgetUser.profiles.avatar_url}
-                  name={budgetUser.profiles.name}
-                  email={budgetUser.profiles.email}
+                  avatarUrl={budgetUser.profile.avatar_url}
+                  name={budgetUser.profile.name}
+                  email={budgetUser.profile.email}
                   size="md"
                   showRing={true}
                 />

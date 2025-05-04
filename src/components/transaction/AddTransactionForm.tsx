@@ -3,23 +3,29 @@ import { Plus } from 'lucide-react';
 import { CSVImport } from './CSVImport';
 import { Transaction } from '../../types/transaction';
 import { Category } from '../../types/category';
+import { Account } from '../../types/account';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useContext';
 
 interface FormData {
-  category_id: string;
+  category_id?: string;
+  account_id: string;
   allocation_id?: string;
   amount: string;
   description: string;
   date: string;
+  transactionType: 'spending' | 'deposit';
 }
 
 interface AddTransactionFormProps {
   formData: FormData;
   onSubmit: (e: React.FormEvent) => void;
   onChange: (data: Partial<FormData>) => void;
-  categories: Category[];
+  categories?: Category[];
   selectedCategoryId?: string;
   onBulkImport?: (transactions: Transaction[]) => void;
   onClose?: () => void;
+  isEditing?: boolean;
 }
 
 export function AddTransactionForm({
@@ -30,60 +36,153 @@ export function AddTransactionForm({
   selectedCategoryId,
   onBulkImport,
   onClose,
+  isEditing = false,
 }: AddTransactionFormProps) {
-  // useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'manual' | 'bulk'>('manual');
   const [groupedCategories, setGroupedCategories] = useState<{
     [key: string]: Category[];
   }>({});
+  const [accounts, setAccounts] = useState<Account[]>([]);
 
   useEffect(() => {
-    // Group categories by budget
-    const grouped = categories.reduce(
-      (acc: { [key: string]: Category[] }, category) => {
-        const budgetName = category.budget?.name || 'Uncategorized';
-        if (!acc[budgetName]) {
-          acc[budgetName] = [];
-        }
-        acc[budgetName].push(category);
-        return acc;
-      },
-      {}
-    );
-    setGroupedCategories(grouped);
+    if (categories) {
+      const grouped = categories.reduce(
+        (acc: { [key: string]: Category[] }, category) => {
+          const budgetName = category.budget?.name || 'Uncategorized';
+          if (!acc[budgetName]) {
+            acc[budgetName] = [];
+          }
+          acc[budgetName].push(category);
+          return acc;
+        },
+        {}
+      );
+      setGroupedCategories(grouped);
+    }
+
+    fetchAccounts();
   }, [categories]);
+
+  async function fetchAccounts() {
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('name');
+
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Convert amount based on transaction type
+    const amount = parseFloat(formData.amount);
+    const adjustedAmount = formData.transactionType === 'spending' ? -Math.abs(amount) : Math.abs(amount);
+    onChange({ amount: adjustedAmount.toString() });
+    onSubmit(e);
+  };
 
   return (
     <div>
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-4">
-        <button
-          className={`px-4 py-2 font-medium text-sm ${
-            activeTab === 'manual'
-              ? 'border-b-2 border-indigo-500 text-indigo-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-          onClick={() => setActiveTab('manual')}
-        >
-          Manual Import
-        </button>
-        <button
-          className={`px-4 py-2 font-medium text-sm ${
-            activeTab === 'bulk'
-              ? 'border-b-2 border-indigo-500 text-indigo-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-          onClick={() => setActiveTab('bulk')}
-        >
-          Bulk Import
-        </button>
-      </div>
+      {!isEditing && (
+        <div className="flex border-b border-gray-200 mb-4">
+          <button
+            className={`px-4 py-2 font-medium text-sm ${
+              activeTab === 'manual'
+                ? 'border-b-2 border-indigo-500 text-indigo-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveTab('manual')}
+          >
+            Manual Import
+          </button>
+          <button
+            className={`px-4 py-2 font-medium text-sm ${
+              activeTab === 'bulk'
+                ? 'border-b-2 border-indigo-500 text-indigo-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveTab('bulk')}
+          >
+            Bulk Import
+          </button>
+        </div>
+      )}
 
-      {/* Manual Import Form */}
       {activeTab === 'manual' && (
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
-            {!selectedCategoryId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Transaction Type
+              </label>
+              <div className="mt-1 space-x-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    value="spending"
+                    checked={formData.transactionType === 'spending'}
+                    onChange={(e) => onChange({ transactionType: e.target.value as 'spending' | 'deposit' })}
+                    className="form-radio text-indigo-600"
+                  />
+                  <span className="ml-2">Spending</span>
+                </label>
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    value="deposit"
+                    checked={formData.transactionType === 'deposit'}
+                    onChange={(e) => onChange({ transactionType: e.target.value as 'spending' | 'deposit' })}
+                    className="form-radio text-indigo-600"
+                  />
+                  <span className="ml-2">Deposit</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="account"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Account
+              </label>
+              <select
+                id="account"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                value={formData.account_id}
+                onChange={(e) => onChange({ account_id: e.target.value })}
+                required
+              >
+                <option value="">Select an account</option>
+                <optgroup label="Bank Accounts">
+                  {accounts
+                    .filter((a) => a.type === 'bank')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Credit Cards">
+                  {accounts
+                    .filter((a) => a.type === 'credit')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+            </div>
+
+            {!selectedCategoryId && categories && (
               <div>
                 <label
                   htmlFor="category"
@@ -172,18 +271,17 @@ export function AddTransactionForm({
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Transaction
+              {isEditing ? 'Update' : 'Add'} Transaction
             </button>
           </div>
         </form>
       )}
 
-      {/* Bulk Import Form */}
-      {activeTab === 'bulk' && (
+      {activeTab === 'bulk' && !isEditing && (
         <div className="space-y-6">
           <CSVImport
             onTransactionsLoaded={onBulkImport || (() => {})}
-            // categories={categories}
+            accounts={accounts}
             onClose={onClose}
           />
         </div>

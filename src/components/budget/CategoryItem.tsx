@@ -1,62 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, ChevronRight, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, ChevronRight, ChevronDown, ArrowDownToLine } from 'lucide-react';
 import { ProgressBar } from './ProgressBar';
 import { Category } from '../../types/category';
 import { getTimeProgress } from '../../utils/timeProgress';
 import { Modal } from '../shared/Modal';
 import { AddTransactionForm } from '../transaction/AddTransactionForm';
 import { TransactionItem } from '../transaction/TransactionItem';
+import { DeleteTransactionModal } from '../transaction/DeleteTransactionModal';
 import { useAuth } from '../../hooks/useContext';
 import { supabase } from '../../lib/supabase';
-import { formatAllocation } from '../../utils/formatAllocation';
-import { calculateDynamicAllocations } from '../../utils/calculateDynamicAllocations';
 
 interface Transaction {
   id: string;
   amount: number;
   description: string;
   date: string;
-  assigned_date: string;
 }
 
-interface AllocationStats {
-  id: string;
-  name: string;
-  percentage: number;
-  amount: number;
-  total_spent: number;
-  reference_total?: number;
+interface CategoryItemProps {
+  category: Category;
+  onDelete: (id: string) => void;
+  onTransactionAdded: () => void;
 }
 
 export function CategoryItem({
   category,
   onDelete,
   onTransactionAdded,
-}: {
-  category: Category;
-  onDelete: (id: string) => void;
-  onTransactionAdded: () => void;
-}) {
+}: CategoryItemProps) {
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [allocationStats, setAllocationStats] = useState<AllocationStats[]>([]);
+  const [isDistributing, setIsDistributing] = useState(false);
+  const [distributedAmount, setDistributedAmount] = useState(0);
   const [formData, setFormData] = useState({
     category_id: category.id,
     amount: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
+    transactionType: 'spending' as 'spending' | 'deposit',
   });
 
   const spentPercentage = ((category.total_spent || 0) / category.amount) * 100;
   const timeProgress = getTimeProgress(category.timeframe);
-
-  // useEffect(() => {
-  //   if (category.type === 'shared_income') {
-  //     calculateAllocationStats();
-  //   }
-  // }, [category, category.amount, category.timeframe]);
 
   useEffect(() => {
     if (isExpanded) {
@@ -64,33 +53,21 @@ export function CategoryItem({
     }
   }, [isExpanded]);
 
-  // async function calculateAllocationStats() {
-  //   try {
-  //     const { data: allocations } = await supabase
-  //       .from('category_allocations')
-  //       .select('*')
-  //       .eq('category_id', category.id);
+  useEffect(() => {
+    calculateDistributedAmount();
+  }, [transactions]);
 
-  //     if (!allocations?.length) return;
-
-  //     // Use the utility function to calculate allocations
-  //     const calculatedStats = await calculateDynamicAllocations(
-  //       allocations,
-  //       category.id,
-  //       category.amount
-  //     );
-
-  //     setAllocationStats(calculatedStats);
-  //   } catch (error) {
-  //     console.error('Error calculating allocation stats:', error);
-  //   }
-  // }
+  async function calculateDistributedAmount() {
+    const distributedTransactions = transactions.filter(t => t.amount > 0);
+    const total = distributedTransactions.reduce((sum, t) => sum + t.amount, 0);
+    setDistributedAmount(total);
+  }
 
   async function fetchTransactions() {
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select('*')
+        .select('id, amount, description, date')
         .eq('category_id', category.id)
         .order('date', { ascending: false });
 
@@ -101,24 +78,15 @@ export function CategoryItem({
     }
   }
 
-  function onNewTransactionDataChange(data: Partial<typeof formData>) {
-    setFormData((prev) => ({
-      ...prev,
-      ...data,
-    }));
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      console.log('Form data:', formData);
       const { error } = await supabase.from('transactions').insert({
-        user_id: user?.id,
-        category_id: category.id,
+        user_id: user.id,
+        category_id: formData.category_id,
         amount: parseFloat(formData.amount),
         description: formData.description,
         date: formData.date,
-        assigned_date: formData.date,
       });
 
       if (error) throw error;
@@ -128,15 +96,69 @@ export function CategoryItem({
         amount: '',
         description: '',
         date: new Date().toISOString().split('T')[0],
+        transactionType: 'spending',
       });
       setShowTransactionModal(false);
       onTransactionAdded();
       if (isExpanded) {
         fetchTransactions();
       }
-      // calculateAllocationStats();
     } catch (error) {
       console.error('Error adding transaction:', error);
+    }
+  }
+
+  async function handleDeleteTransaction(transaction: Transaction) {
+    setSelectedTransaction(transaction);
+    setShowDeleteModal(true);
+  }
+
+  async function confirmDeleteTransaction() {
+    if (!selectedTransaction) return;
+
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', selectedTransaction.id);
+
+      if (error) throw error;
+      
+      setShowDeleteModal(false);
+      setSelectedTransaction(null);
+      fetchTransactions();
+      onTransactionAdded();
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+    }
+  }
+
+  async function handleDistributeFunds() {
+    try {
+      setIsDistributing(true);
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/distribute-funds`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          budgetId: category.budget_id,
+          categoryId: category.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to distribute funds');
+      }
+
+      fetchTransactions();
+      onTransactionAdded();
+    } catch (error) {
+      console.error('Error distributing funds:', error);
+    } finally {
+      setIsDistributing(false);
     }
   }
 
@@ -170,6 +192,8 @@ export function CategoryItem({
                 className={`text-xs px-2 py-1 rounded-full ${
                   category.type === 'shared_income'
                     ? 'bg-purple-100 text-purple-700'
+                    : category.type === 'income'
+                    ? 'bg-green-100 text-green-700'
                     : 'bg-gray-100 text-gray-600'
                 }`}
               >
@@ -180,6 +204,18 @@ export function CategoryItem({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {(category.type === 'income' || category.type === 'shared_income') && (
+              <button
+                onClick={handleDistributeFunds}
+                disabled={isDistributing}
+                className={`text-green-600 hover:text-green-800 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isDistributing ? 'animate-pulse' : ''
+                }`}
+                title="Distribute funds to spending categories"
+              >
+                <ArrowDownToLine className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={() => setShowTransactionModal(true)}
               className="text-indigo-600 hover:text-indigo-800"
@@ -195,47 +231,14 @@ export function CategoryItem({
           </div>
         </div>
 
-        {/* Main category progress bar */}
         {category.amount_type === 'fixed' && (
           <ProgressBar
             spentPercentage={spentPercentage}
             timeProgress={timeProgress}
             type={category.type}
+            distributedAmount={distributedAmount}
+            totalAmount={category.amount}
           />
-        )}
-
-        {/* Shared income allocations */}
-        {category.type === 'shared_income' && allocationStats.length > 0 && (
-          <div className="space-y-4">
-            {allocationStats.map((allocation) => {
-              const allocationSpentPercentage = (allocation.total_spent / allocation.amount) * 100;
-              return (
-                <div key={allocation.id} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">
-                        {allocation.name}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {formatAllocation(
-                          allocation.percentage,
-                          category.shared_amount || category.amount
-                        )}
-                      </span>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      ${allocation.total_spent.toFixed(2)}/${allocation.amount.toFixed(2)} earned
-                    </span>
-                  </div>
-                  <ProgressBar
-                    spentPercentage={allocationSpentPercentage}
-                    timeProgress={timeProgress}
-                    type="income"
-                  />
-                </div>
-              );
-            })}
-          </div>
         )}
 
         {isExpanded && (
@@ -250,10 +253,8 @@ export function CategoryItem({
                   description={transaction.description}
                   amount={transaction.amount}
                   date={transaction.date}
-                  assignedDate={transaction.assigned_date}
-                  onDelete={() => {
-                    /* Handle delete */
-                  }}
+                  assignedDate={transaction.date}
+                  onDelete={() => handleDeleteTransaction(transaction)}
                 />
               ))
             )}
@@ -269,12 +270,25 @@ export function CategoryItem({
         <AddTransactionForm
           formData={formData}
           onSubmit={handleSubmit}
-          onChange={onNewTransactionDataChange}
+          onChange={(data) => setFormData({ ...formData, ...data })}
           categories={[category]}
           selectedCategoryId={category.id}
           onClose={() => setShowTransactionModal(false)}
         />
       </Modal>
+
+      {selectedTransaction && (
+        <DeleteTransactionModal
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setSelectedTransaction(null);
+          }}
+          onConfirm={confirmDeleteTransaction}
+          description={selectedTransaction.description}
+          amount={selectedTransaction.amount}
+        />
+      )}
     </div>
   );
 }

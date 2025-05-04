@@ -24,14 +24,26 @@ interface Transaction {
   description: string;
   date: string;
   assigned_date: string;
+  type: 'account' | 'virtual' | 'income_distribution';
+  account_id: string | null;
   category?: {
     name: string;
+  } | null;
+  account?: {
+    name: string;
+    icon: string;
   } | null;
 }
 
 interface Category {
   id: string;
   name: string;
+}
+
+interface Account {
+  id: string;
+  name: string;
+  type: 'bank' | 'credit';
 }
 
 interface GroupedTransactions {
@@ -48,6 +60,8 @@ export function Transactions() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [filterType, setFilterType] = useState<FilterType>("recent");
@@ -66,20 +80,20 @@ export function Transactions() {
   useEffect(() => {
     fetchTransactions();
     fetchCategories();
+    fetchAccounts();
   }, []);
 
   useEffect(() => {
     if (allTransactions.length > 0) {
       applyFilters();
     }
-  }, [filterType, customFilter, allTransactions]);
+  }, [filterType, customFilter, selectedAccount, allTransactions]);
 
   const sortTransactions = (a: Transaction, b: Transaction) => {
     const dateA = parseISO(a.assigned_date);
     const dateB = parseISO(b.assigned_date);
     const dateDiff = dateB.getTime() - dateA.getTime();
 
-    // If dates are the same, sort by description
     if (dateDiff === 0) {
       return a.description.localeCompare(b.description);
     }
@@ -90,10 +104,18 @@ export function Transactions() {
     let filteredTransactions = [...allTransactions];
     const now = new Date();
 
+    // Filter out income_distribution transactions
+    filteredTransactions = filteredTransactions.filter(t => t.type !== 'income_distribution');
+
+    // Apply account filter
+    if (selectedAccount !== 'all') {
+      filteredTransactions = filteredTransactions.filter(t => t.account_id === selectedAccount);
+    }
+
     switch (filterType) {
       case "recent":
         const thirtyOneDaysAgo = subDays(now, 31);
-        filteredTransactions = allTransactions.filter((t) => {
+        filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: thirtyOneDaysAgo,
@@ -102,7 +124,7 @@ export function Transactions() {
         });
         break;
       case "current-month":
-        filteredTransactions = allTransactions.filter((t) => {
+        filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(now),
@@ -112,7 +134,7 @@ export function Transactions() {
         break;
       case "last-month":
         const lastMonth = subMonths(now, 1);
-        filteredTransactions = allTransactions.filter((t) => {
+        filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(lastMonth),
@@ -122,7 +144,7 @@ export function Transactions() {
         break;
       case "last-3-months":
         const threeMonthsAgo = subMonths(now, 3);
-        filteredTransactions = allTransactions.filter((t) => {
+        filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
             start: startOfMonth(threeMonthsAgo),
@@ -131,7 +153,7 @@ export function Transactions() {
         });
         break;
       case "custom":
-        filteredTransactions = allTransactions.filter((t) => {
+        filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return (
             date.getFullYear().toString() === customFilter.year &&
@@ -141,13 +163,9 @@ export function Transactions() {
         break;
     }
 
-    // Sort transactions by assigned date and description
     filteredTransactions.sort(sortTransactions);
-
     const groupedData = groupTransactionsByDate(filteredTransactions);
     setTransactions(groupedData);
-
-    // Set all years as expanded by default
     const years = Object.keys(groupedData);
     setExpandedGroups(new Set(years));
   };
@@ -168,8 +186,6 @@ export function Transactions() {
           groups[year][month] = [];
         }
         groups[year][month].push(transaction);
-
-        // Sort transactions within each month by assigned date and description
         groups[year][month].sort(sortTransactions);
 
         return groups;
@@ -190,7 +206,10 @@ export function Transactions() {
           description,
           date,
           assigned_date,
-          category:categories(name)
+          account_id,
+          type,
+          category:categories(name),
+          account:accounts(name, icon)
         `
         )
         .eq("user_id", user.id)
@@ -199,18 +218,13 @@ export function Transactions() {
 
       if (error) throw error;
 
-      // Convert UTC dates to local timezone for display
       const localData = data?.map(transaction => ({
         ...transaction,
-        // date: toZonedTime(transaction.date, profile?.timezone || 'UTC'),
-        //assigned_date: toZonedTime(transaction.assigned_date, profile?.timezone || 'UTC')
       })) || [];
 
       setAllTransactions(localData);
       const groupedData = groupTransactionsByDate(localData);
       setTransactions(groupedData);
-
-      // Set all years as expanded by default
       const years = Object.keys(groupedData);
       setExpandedGroups(new Set(years));
     } catch (error) {
@@ -234,6 +248,21 @@ export function Transactions() {
     }
   }
 
+  async function fetchAccounts() {
+    try {
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("id, name, type")
+        .eq("user_id", user.id)
+        .order("name");
+
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
@@ -245,6 +274,7 @@ export function Transactions() {
         description: formData.description,
         date: utcDate,
         assigned_date: utcDate,
+        type: 'account',
       });
 
       if (error) throw error;
@@ -321,10 +351,38 @@ export function Transactions() {
         </button>
       </div>
 
-      {/* Filter Controls */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <Filter className="w-5 h-5 text-gray-500" />
+          
+          <select
+            value={selectedAccount}
+            onChange={(e) => setSelectedAccount(e.target.value)}
+            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          >
+            <option value="all">All Accounts</option>
+            <optgroup label="Bank Accounts">
+              {accounts
+                .filter(a => a.type === 'bank')
+                .map(account => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))
+              }
+            </optgroup>
+            <optgroup label="Credit Cards">
+              {accounts
+                .filter(a => a.type === 'credit')
+                .map(account => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))
+              }
+            </optgroup>
+          </select>
+
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as FilterType)}
@@ -370,7 +428,6 @@ export function Transactions() {
         </div>
       </div>
 
-      {/* Transactions List */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="min-w-full divide-y divide-gray-200">
           <div className="bg-gray-50 px-6 py-3">
@@ -433,8 +490,11 @@ export function Transactions() {
                                     date={transaction.date}
                                     assignedDate={transaction.assigned_date}
                                     categoryName={transaction.category?.name}
+                                    accountName={transaction.account?.name}
+                                    accountIcon={transaction.account?.icon}
                                     onDelete={handleDelete}
                                     onAssignedDateChange={fetchTransactions}
+                                    onEdit={fetchTransactions}
                                   />
                                 ))}
                               </div>
