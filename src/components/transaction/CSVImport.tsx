@@ -10,19 +10,19 @@ import {
 import { format, parseISO } from 'date-fns';
 import { Amount } from '../shared/Amount';
 import { Transaction } from '../../types/transaction';
+import { Account } from '../../types/account';
 
 interface CSVTransaction {
   date: string;
   description: string;
   amount: string;
-  // budget?: string;
   isDuplicate?: boolean;
   selected?: boolean;
 }
 
 interface CSVImportProps {
   onTransactionsLoaded: (transactions: Transaction[]) => void;
-  // budgets: Array<{ id: string; name: string }>;
+  accounts: Account[];
   onClose?: () => void;
 }
 
@@ -39,7 +39,7 @@ interface ImportError {
 
 export function CSVImport({
   onTransactionsLoaded,
-  // budgets,
+  accounts,
   onClose,
 }: CSVImportProps) {
   const { user } = useAuth();
@@ -76,6 +76,7 @@ export function CSVImport({
   const [parsedTransactions, setParsedTransactions] = useState<
     CSVTransaction[]
   >([]);
+  const [selectedAccount, setSelectedAccount] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -278,6 +279,11 @@ export function CSVImport({
   };
 
   const importTransactions = async (transactions: CSVTransaction[]) => {
+    if (!selectedAccount) {
+      setError('Please select an account');
+      return;
+    }
+
     setMappingStep('importing');
     const stats = {
       total: transactions.length,
@@ -296,7 +302,8 @@ export function CSVImport({
           description: transaction.description,
           date: transaction.date,
           assigned_date: transaction.date,
-          budget_id: null,
+          account_id: selectedAccount,
+          type: 'account',
         });
 
         if (error) throw error;
@@ -322,7 +329,8 @@ export function CSVImport({
           description: t.description,
           date: t.date,
           assigned_date: t.date,
-          budget_id: null,
+          account_id: selectedAccount,
+          type: 'account',
         }) as unknown as Transaction
     );
     onTransactionsLoaded(selectedTransactions);
@@ -399,6 +407,39 @@ export function CSVImport({
             default.
           </p>
         </div>
+
+        <div className="p-4 border-b">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select Account
+          </label>
+          <select
+            value={selectedAccount}
+            onChange={(e) => setSelectedAccount(e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          >
+            <option value="">Select an account</option>
+            <optgroup label="Bank Accounts">
+              {accounts
+                .filter((a) => a.type === 'bank')
+                .map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label="Credit Cards">
+              {accounts
+                .filter((a) => a.type === 'credit')
+                .map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+            </optgroup>
+          </select>
+        </div>
+
         <div className="overflow-x-auto max-h-[60vh]">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="sticky top-0 bg-white">
@@ -479,7 +520,9 @@ export function CSVImport({
               </button>
               <button
                 onClick={() => importTransactions(parsedTransactions)}
-                disabled={!parsedTransactions.some((t) => t.selected)}
+                disabled={
+                  !parsedTransactions.some((t) => t.selected) || !selectedAccount
+                }
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Import Selected

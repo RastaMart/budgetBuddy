@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../hooks/useContext";
-import { Plus, ChevronDown, ChevronRight, Filter } from "lucide-react";
-import { TransactionItem } from "../components/transaction/TransactionItem";
-import { Modal } from "../components/shared/Modal";
-import { AddTransactionForm } from "../components/transaction/AddTransactionForm";
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useContext';
+import { Plus, ChevronDown, ChevronRight, Filter } from 'lucide-react';
+import { TransactionItem } from '../components/transaction/TransactionItem';
+import { Modal } from '../components/shared/Modal';
+import { AddTransactionForm } from '../components/transaction/AddTransactionForm';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import {
   format,
@@ -15,7 +15,7 @@ import {
   isWithinInterval,
   subDays,
   endOfDay,
-} from "date-fns";
+} from 'date-fns';
 
 interface Transaction {
   id: string;
@@ -52,7 +52,12 @@ interface GroupedTransactions {
   };
 }
 
-type FilterType = "recent" | "last-month" | "current-month" | "last-3-months" | "custom";
+type FilterType =
+  | 'recent'
+  | 'last-month'
+  | 'current-month'
+  | 'last-3-months'
+  | 'custom';
 
 export function Transactions() {
   const { user, profile } = useAuth();
@@ -64,16 +69,23 @@ export function Transactions() {
   const [selectedAccount, setSelectedAccount] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [filterType, setFilterType] = useState<FilterType>("recent");
+  const [filterType, setFilterType] = useState<FilterType>('recent');
   const [customFilter, setCustomFilter] = useState({
-    year: new Date().getFullYear().toString(),
-    month: format(new Date(), "MMMM"),
+    year: null,
+    month: null,
+  });
+  const [availableYearsMonths, setAvailableYearsMonths] = useState<{
+    years: string[];
+    months: string[];
+  }>({
+    years: [],
+    months: [],
   });
 
   const [formData, setFormData] = useState({
-    category_id: "",
-    amount: "",
-    description: "",
+    category_id: '',
+    amount: '',
+    description: '',
     date: toZonedTime(new Date(), profile?.timezone || 'UTC'),
   });
 
@@ -85,6 +97,12 @@ export function Transactions() {
 
   useEffect(() => {
     if (allTransactions.length > 0) {
+      const { years: newYears, months: newMonths } =
+        getAvailableYearsAndMonths();
+      setAvailableYearsMonths({ years: newYears, months: newMonths });
+      if (customFilter.year === null && customFilter.month === null) {
+        setCustomFilter({ year: newYears[0], month: newMonths[0] });
+      }
       applyFilters();
     }
   }, [filterType, customFilter, selectedAccount, allTransactions]);
@@ -101,19 +119,24 @@ export function Transactions() {
   };
 
   const applyFilters = () => {
+    console.log('applyFilters', allTransactions);
     let filteredTransactions = [...allTransactions];
     const now = new Date();
 
     // Filter out income_distribution transactions
-    filteredTransactions = filteredTransactions.filter(t => t.type !== 'income_distribution');
+    filteredTransactions = filteredTransactions.filter(
+      (t) => t.type !== 'income_distribution'
+    );
 
     // Apply account filter
     if (selectedAccount !== 'all') {
-      filteredTransactions = filteredTransactions.filter(t => t.account_id === selectedAccount);
+      filteredTransactions = filteredTransactions.filter(
+        (t) => t.account_id === selectedAccount
+      );
     }
 
     switch (filterType) {
-      case "recent":
+      case 'recent':
         const thirtyOneDaysAgo = subDays(now, 31);
         filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
@@ -123,7 +146,7 @@ export function Transactions() {
           });
         });
         break;
-      case "current-month":
+      case 'current-month':
         filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return isWithinInterval(date, {
@@ -132,7 +155,7 @@ export function Transactions() {
           });
         });
         break;
-      case "last-month":
+      case 'last-month':
         const lastMonth = subMonths(now, 1);
         filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
@@ -142,7 +165,7 @@ export function Transactions() {
           });
         });
         break;
-      case "last-3-months":
+      case 'last-3-months':
         const threeMonthsAgo = subMonths(now, 3);
         filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
@@ -152,16 +175,19 @@ export function Transactions() {
           });
         });
         break;
-      case "custom":
+      case 'custom':
+        console.log('customFilter', customFilter);
         filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return (
             date.getFullYear().toString() === customFilter.year &&
-            format(date, "MMMM") === customFilter.month
+            format(date, 'MMMM') === customFilter.month
           );
         });
         break;
     }
+
+    console.log('applyFilters', filteredTransactions);
 
     filteredTransactions.sort(sortTransactions);
     const groupedData = groupTransactionsByDate(filteredTransactions);
@@ -177,7 +203,7 @@ export function Transactions() {
       (groups: GroupedTransactions, transaction) => {
         const date = parseISO(transaction.assigned_date);
         const year = date.getFullYear().toString();
-        const month = format(date, "MMMM");
+        const month = format(date, 'MMMM');
 
         if (!groups[year]) {
           groups[year] = {};
@@ -197,7 +223,7 @@ export function Transactions() {
   async function fetchTransactions() {
     try {
       const { data, error } = await supabase
-        .from("transactions")
+        .from('transactions')
         .select(
           `
           id,
@@ -212,15 +238,16 @@ export function Transactions() {
           account:accounts(name, icon)
         `
         )
-        .eq("user_id", user.id)
-        .order("assigned_date", { ascending: false })
-        .order("description", { ascending: true });
+        .eq('user_id', user.id)
+        .order('assigned_date', { ascending: false })
+        .order('description', { ascending: true });
 
       if (error) throw error;
 
-      const localData = data?.map(transaction => ({
-        ...transaction,
-      })) || [];
+      const localData =
+        data?.map((transaction) => ({
+          ...transaction,
+        })) || [];
 
       setAllTransactions(localData);
       const groupedData = groupTransactionsByDate(localData);
@@ -228,7 +255,7 @@ export function Transactions() {
       const years = Object.keys(groupedData);
       setExpandedGroups(new Set(years));
     } catch (error) {
-      console.error("Error fetching transactions:", error);
+      console.error('Error fetching transactions:', error);
     } finally {
       setIsLoading(false);
     }
@@ -237,37 +264,40 @@ export function Transactions() {
   async function fetchCategories() {
     try {
       const { data, error } = await supabase
-        .from("categories")
-        .select("id, name")
-        .eq("user_id", user.id);
+        .from('categories')
+        .select('id, name')
+        .eq('user_id', user.id);
 
       if (error) throw error;
       setCategories(data || []);
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.error('Error fetching categories:', error);
     }
   }
 
   async function fetchAccounts() {
     try {
       const { data, error } = await supabase
-        .from("accounts")
-        .select("id, name, type")
-        .eq("user_id", user.id)
-        .order("name");
+        .from('accounts')
+        .select('id, name, type')
+        .eq('user_id', user.id)
+        .order('name');
 
       if (error) throw error;
       setAccounts(data || []);
     } catch (error) {
-      console.error("Error fetching accounts:", error);
+      console.error('Error fetching accounts:', error);
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const utcDate = fromZonedTime(new Date(formData.date), profile?.timezone || 'UTC');
-      const { error } = await supabase.from("transactions").insert({
+      const utcDate = fromZonedTime(
+        new Date(formData.date),
+        profile?.timezone || 'UTC'
+      );
+      const { error } = await supabase.from('transactions').insert({
         user_id: user.id,
         category_id: formData.category_id || null,
         amount: parseFloat(formData.amount),
@@ -280,30 +310,30 @@ export function Transactions() {
       if (error) throw error;
 
       setFormData({
-        category_id: "",
-        amount: "",
-        description: "",
+        category_id: '',
+        amount: '',
+        description: '',
         date: toZonedTime(new Date().toISOString(), profile?.timezone || 'UTC'),
       });
 
       setShowTransactionModal(false);
       fetchTransactions();
     } catch (error) {
-      console.error("Error adding transaction:", error);
+      console.error('Error adding transaction:', error);
     }
   }
 
   async function handleDelete(id: string) {
     try {
       const { error } = await supabase
-        .from("transactions")
+        .from('transactions')
         .delete()
-        .eq("id", id);
+        .eq('id', id);
 
       if (error) throw error;
       fetchTransactions();
     } catch (error) {
-      console.error("Error deleting transaction:", error);
+      console.error('Error deleting transaction:', error);
     }
   }
 
@@ -325,19 +355,21 @@ export function Transactions() {
   const getAvailableYearsAndMonths = () => {
     const years = Array.from(
       new Set(
-        allTransactions.map((t) => parseISO(t.assigned_date).getFullYear())
+        allTransactions.map((t) =>
+          parseISO(t.assigned_date).getFullYear().toString()
+        )
       )
     ).sort((a, b) => b - a);
     const months = Array.from(
       new Set(
-        allTransactions.map((t) => format(parseISO(t.assigned_date), "MMMM"))
+        allTransactions.map((t) => format(parseISO(t.assigned_date), 'MMMM'))
       )
     );
     return { years, months };
   };
 
-  const { years, months } = getAvailableYearsAndMonths();
-
+  const { years, months } = availableYearsMonths;
+  console.log({ years, months });
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -354,7 +386,7 @@ export function Transactions() {
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex items-center gap-4 flex-wrap">
           <Filter className="w-5 h-5 text-gray-500" />
-          
+
           <select
             value={selectedAccount}
             onChange={(e) => setSelectedAccount(e.target.value)}
@@ -363,23 +395,21 @@ export function Transactions() {
             <option value="all">All Accounts</option>
             <optgroup label="Bank Accounts">
               {accounts
-                .filter(a => a.type === 'bank')
-                .map(account => (
+                .filter((a) => a.type === 'bank')
+                .map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.name}
                   </option>
-                ))
-              }
+                ))}
             </optgroup>
             <optgroup label="Credit Cards">
               {accounts
-                .filter(a => a.type === 'credit')
-                .map(account => (
+                .filter((a) => a.type === 'credit')
+                .map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.name}
                   </option>
-                ))
-              }
+                ))}
             </optgroup>
           </select>
 
@@ -395,7 +425,7 @@ export function Transactions() {
             <option value="custom">Custom</option>
           </select>
 
-          {filterType === "custom" && (
+          {filterType === 'custom' && (
             <div className="flex gap-2">
               <select
                 value={customFilter.year}
