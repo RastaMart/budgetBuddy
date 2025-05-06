@@ -91,6 +91,15 @@ export function AddTransactionForm({
     onSubmit(e);
   };
 
+  const handleBulkImport = (transactions: Transaction[]) => {
+    if (onBulkImport) {
+      onBulkImport(transactions);
+    }
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
     <div>
       {!isEditing && (
@@ -295,7 +304,7 @@ export function AddTransactionForm({
       {activeTab === 'bulk' && !isEditing && (
         <div className="space-y-6">
           <CSVImport
-            onTransactionsLoaded={onBulkImport || (() => {})}
+            onTransactionsLoaded={handleBulkImport}
             accounts={accounts}
             onClose={onClose}
           />

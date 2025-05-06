@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { Category } from '../../types/category';
 
 interface FormData {
   name: string;
@@ -24,15 +25,13 @@ interface BudgetAllocation {
 
 interface AddCategoryFormProps {
   formData: FormData;
-  onSubmit: (e: React.FormEvent) => void;
   onChange: (data: Partial<FormData>) => void;
   budgetId: string;
-  onSuccess?: () => void;
+  onSuccess?: (categories: Category[]) => void;
 }
 
 export function AddCategoryForm({
   formData,
-  onSubmit,
   onChange,
   budgetId,
   onSuccess,
@@ -65,7 +64,10 @@ export function AddCategoryForm({
       // For dynamic allocations, calculate percentages based on last month's transactions
       const allocationsWithCalculations = await Promise.all(
         (allocationsData || []).map(async (allocation) => {
-          if (allocation.allocation_type === 'dynamic' && allocation.reference_category_id) {
+          if (
+            allocation.allocation_type === 'dynamic' &&
+            allocation.reference_category_id
+          ) {
             const lastMonth = subMonths(new Date(), 1);
             const startDate = startOfMonth(lastMonth);
             const endDate = endOfMonth(lastMonth);
@@ -98,8 +100,12 @@ export function AddCategoryForm({
         .reduce((sum, a) => sum + (a.reference_amount || 0), 0);
 
       const finalAllocations = allocationsWithCalculations.map((allocation) => {
-        if (allocation.allocation_type === 'dynamic' && totalDynamicAmount > 0) {
-          const calculatedPercentage = ((allocation.reference_amount || 0) / totalDynamicAmount) * 100;
+        if (
+          allocation.allocation_type === 'dynamic' &&
+          totalDynamicAmount > 0
+        ) {
+          const calculatedPercentage =
+            ((allocation.reference_amount || 0) / totalDynamicAmount) * 100;
           return {
             ...allocation,
             calculated_percentage: parseFloat(calculatedPercentage.toFixed(2)),
@@ -125,38 +131,54 @@ export function AddCategoryForm({
 
     try {
       setError(null);
+      const newCategories = [];
       if (formData.type === 'shared_income') {
         // Create a category for each allocation
-        const categoryPromises = allocations.map(allocation => {
-          const percentage = allocation.allocation_type === 'manual' 
-            ? allocation.percentage 
-            : allocation.calculated_percentage || 0;
-            
-          return supabase.from('categories').insert({
-            budget_id: budgetId,
-            user_id: user.id,
-            name: `${formData.name} - ${allocation.name}`,
-            amount: parseFloat(formData.amount) * (percentage / 100),
-            timeframe: formData.timeframe,
-            type: formData.type,
-            amount_type: formData.amount_type,
-            shared_amount: parseFloat(formData.amount),
-            allocation_id: allocation.id
-          });
+        const categoryPromises = allocations.map(async (allocation) => {
+          const percentage =
+            allocation.allocation_type === 'manual'
+              ? allocation.percentage
+              : allocation.calculated_percentage || 0;
+
+          const { data, error } = await supabase
+            .from('categories')
+            .insert({
+              budget_id: budgetId,
+              user_id: user.id,
+              name: `${formData.name} - ${allocation.name}`,
+              amount: parseFloat(formData.amount) * (percentage / 100),
+              timeframe: formData.timeframe,
+              type: formData.type,
+              amount_type: formData.amount_type,
+              shared_amount: parseFloat(formData.amount),
+              allocation_id: allocation.id,
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          newCategories.push(data);
+          return data;
         });
 
         await Promise.all(categoryPromises);
       } else {
         // Create a single category for non-shared types
-        await supabase.from('categories').insert({
-          budget_id: budgetId,
-          user_id: user.id,
-          name: formData.name,
-          amount: parseFloat(formData.amount),
-          timeframe: formData.timeframe,
-          type: formData.type,
-          amount_type: formData.amount_type
-        });
+        const { data, error } = await supabase
+          .from('categories')
+          .insert({
+            budget_id: budgetId,
+            user_id: user.id,
+            name: formData.name,
+            amount: parseFloat(formData.amount),
+            timeframe: formData.timeframe,
+            type: formData.type,
+            amount_type: formData.amount_type,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        newCategories.push(data);
       }
 
       // Reset form
@@ -165,12 +187,12 @@ export function AddCategoryForm({
         amount: '',
         timeframe: 'monthly',
         type: 'spending',
-        amount_type: 'fixed'
+        amount_type: 'fixed',
       });
 
       // Notify parent of success
       if (onSuccess) {
-        onSuccess();
+        onSuccess(newCategories);
       }
     } catch (error) {
       console.error('Error creating category:', error);
@@ -192,14 +214,15 @@ export function AddCategoryForm({
 
   const totalDynamicPercentage = allocations
     .filter((a) => a.allocation_type === 'dynamic')
-    .reduce((sum, allocation) => sum + (allocation.calculated_percentage || 0), 0);
+    .reduce(
+      (sum, allocation) => sum + (allocation.calculated_percentage || 0),
+      0
+    );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="p-4 text-red-600 bg-red-50 rounded-md">
-          {error}
-        </div>
+        <div className="p-4 text-red-600 bg-red-50 rounded-md">{error}</div>
       )}
 
       <div>
@@ -234,7 +257,10 @@ export function AddCategoryForm({
                 checked={formData.type === 'spending'}
                 onChange={(e) =>
                   onChange({
-                    type: e.target.value as 'spending' | 'income' | 'shared_income',
+                    type: e.target.value as
+                      | 'spending'
+                      | 'income'
+                      | 'shared_income',
                   })
                 }
               />
@@ -250,7 +276,10 @@ export function AddCategoryForm({
                 checked={formData.type === 'income'}
                 onChange={(e) =>
                   onChange({
-                    type: e.target.value as 'spending' | 'income' | 'shared_income',
+                    type: e.target.value as
+                      | 'spending'
+                      | 'income'
+                      | 'shared_income',
                   })
                 }
               />
@@ -266,7 +295,10 @@ export function AddCategoryForm({
                 checked={formData.type === 'shared_income'}
                 onChange={(e) =>
                   onChange({
-                    type: e.target.value as 'spending' | 'income' | 'shared_income',
+                    type: e.target.value as
+                      | 'spending'
+                      | 'income'
+                      | 'shared_income',
                   })
                 }
               />
@@ -371,22 +403,33 @@ export function AddCategoryForm({
           </div>
           <div className="bg-gray-50 p-4 rounded-lg space-y-2">
             {allocations.map((allocation) => (
-              <div key={allocation.id} className="flex justify-between items-center">
+              <div
+                key={allocation.id}
+                className="flex justify-between items-center"
+              >
                 <div>
                   <p className="font-medium">{allocation.name}</p>
                   <p className="text-sm text-gray-500">
                     {allocation.allocation_type === 'manual'
                       ? `${allocation.percentage}%`
                       : `Dynamic: ${allocation.calculated_percentage?.toFixed(1)}%`}
-                    {allocation.reference_amount !== undefined && allocation.allocation_type === 'dynamic' && (
-                      <span className="ml-2">
-                        (${allocation.reference_amount.toFixed(2)})
-                      </span>
-                    )}
+                    {allocation.reference_amount !== undefined &&
+                      allocation.allocation_type === 'dynamic' && (
+                        <span className="ml-2">
+                          (${allocation.reference_amount.toFixed(2)})
+                        </span>
+                      )}
                   </p>
                 </div>
                 <div className="text-sm text-gray-700">
-                  ${((parseFloat(formData.amount) || 0) * ((allocation.allocation_type === 'manual' ? allocation.percentage : (allocation.calculated_percentage || 0)) / 100)).toFixed(2)}
+                  $
+                  {(
+                    (parseFloat(formData.amount) || 0) *
+                    ((allocation.allocation_type === 'manual'
+                      ? allocation.percentage
+                      : allocation.calculated_percentage || 0) /
+                      100)
+                  ).toFixed(2)}
                 </div>
               </div>
             ))}

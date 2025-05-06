@@ -7,6 +7,7 @@ import { Modal } from '../shared/Modal';
 import { AddTransactionForm } from './AddTransactionForm';
 import { getAccountIcon } from '../../utils/accountIcons';
 import { Account } from '../../types/account';
+import { BudgetCategoryModal } from './BudgetCategoryModal';
 
 interface TransactionItemProps {
   id: string;
@@ -23,6 +24,11 @@ interface TransactionItemProps {
   onDelete?: (id: string) => void;
   onAssignedDateChange?: () => void;
   onEdit?: () => void;
+  budget?: {
+    id: string;
+    name: string;
+  };
+  category_id?: string;
 }
 
 export function TransactionItem({
@@ -39,12 +45,15 @@ export function TransactionItem({
   onDelete,
   onAssignedDateChange,
   onEdit,
+  budget,
+  category_id,
 }: TransactionItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isEditingAmount, setIsEditingAmount] = useState(false);
   const [isEditingAccount, setIsEditingAccount] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [newAssignedDate, setNewAssignedDate] = useState(assignedDate);
   const [newDescription, setNewDescription] = useState(description);
   const [newAmount, setNewAmount] = useState(Math.abs(amount).toString());
@@ -203,12 +212,47 @@ export function TransactionItem({
     }
   };
 
+  const handleCategoryUpdate = async (
+    newCategoryId: string,
+    applyTo: 'single' | 'unassigned' | 'all'
+  ) => {
+    try {
+      console.log('handleCategoryUpdate', newCategoryId, applyTo);
+      const query = supabase.from('transactions');
+
+      switch (applyTo) {
+        case 'single':
+          await query.update({ category_id: newCategoryId }).eq('id', id);
+          break;
+
+        case 'unassigned':
+          await query
+            .update({ category_id: newCategoryId })
+            .eq('description', description)
+            .is('category_id', null)
+            .neq('type', 'income_distribution');
+          break;
+
+        case 'all':
+          await query
+            .update({ category_id: newCategoryId })
+            .eq('description', description)
+            .neq('type', 'income_distribution');
+          break;
+      }
+
+      if (onEdit) {
+        onEdit();
+      }
+    } catch (error) {
+      console.error('Error updating category:', error);
+    }
+  };
+
   return (
     <>
       <div className="flex items-center py-2 text-sm">
-        {/* Fixed-width section for account and date */}
         <div className="flex items-center gap-4 w-[400px] flex-shrink-0">
-          {/* Account section - fixed width */}
           <div className="w-[200px] flex items-center gap-2">
             {isEditingAccount ? (
               <select
@@ -252,7 +296,6 @@ export function TransactionItem({
             )}
           </div>
 
-          {/* Date section - fixed width */}
           <div className="w-[200px] flex items-center gap-2">
             <button
               onClick={() => setIsEditing(!isEditing)}
@@ -279,7 +322,6 @@ export function TransactionItem({
           </div>
         </div>
 
-        {/* Flexible-width section for description */}
         <div className="flex-1 min-w-0 px-4">
           {isEditingDescription ? (
             <input
@@ -300,22 +342,24 @@ export function TransactionItem({
               onClick={() => setIsEditingDescription(true)}
               className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
             >
-              <div className="truncate">
-                <span className="font-medium text-gray-900">{description}</span>
-                {categoryName && (
-                  <span className="text-gray-500 ml-2">• {categoryName}</span>
-                )}
-                {allocationName && (
-                  <span className="text-purple-600 ml-2">
-                    • {allocationName}
-                  </span>
-                )}
-              </div>
+              <span className="font-medium text-gray-900">{description}</span>
             </button>
           )}
         </div>
 
-        {/* Fixed-width section for amount and actions */}
+        <div className="w-[200px] flex-shrink-0">
+          <button
+            onClick={() => setShowBudgetModal(true)}
+            className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
+          >
+            {categoryName ? (
+              <span className="text-indigo-600">{categoryName}</span>
+            ) : (
+              <span className="text-gray-400">No category</span>
+            )}
+          </button>
+        </div>
+
         <div className="flex items-center gap-4 w-[200px] flex-shrink-0 justify-end">
           {isEditingAmount ? (
             <input
@@ -369,6 +413,14 @@ export function TransactionItem({
           onClose={() => setIsEditModalOpen(false)}
         />
       </Modal>
+
+      <BudgetCategoryModal
+        isOpen={showBudgetModal}
+        onClose={() => setShowBudgetModal(false)}
+        description={description}
+        onSelect={handleCategoryUpdate}
+        currentCategoryId={category_id}
+      />
     </>
   );
 }
