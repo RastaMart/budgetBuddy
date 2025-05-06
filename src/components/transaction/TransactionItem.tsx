@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { Modal } from '../shared/Modal';
 import { AddTransactionForm } from './AddTransactionForm';
 import { getAccountIcon } from '../../utils/accountIcons';
+import { Account } from '../../types/account';
 
 interface TransactionItemProps {
   id: string;
@@ -40,15 +41,43 @@ export function TransactionItem({
   onEdit,
 }: TransactionItemProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [isEditingAmount, setIsEditingAmount] = useState(false);
+  const [isEditingAccount, setIsEditingAccount] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [newAssignedDate, setNewAssignedDate] = useState(assignedDate);
+  const [newDescription, setNewDescription] = useState(description);
+  const [newAmount, setNewAmount] = useState(Math.abs(amount).toString());
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [editFormData, setEditFormData] = useState({
     description,
     amount: Math.abs(amount).toString(),
     date,
     account_id: account_id || '',
-    transactionType: amount < 0 ? 'spending' : ('deposit' as 'spending' | 'deposit'),
+    transactionType:
+      amount < 0 ? 'spending' : ('deposit' as 'spending' | 'deposit'),
   });
+
+  const Icon = accountIcon ? getAccountIcon(accountIcon) : null;
+  const datesAreDifferent = !isEqual(parseISO(date), parseISO(assignedDate));
+
+  React.useEffect(() => {
+    fetchAccounts();
+  }, []);
+
+  async function fetchAccounts() {
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+    }
+  }
 
   const handleDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = e.target.value;
@@ -70,6 +99,80 @@ export function TransactionItem({
       setNewAssignedDate(assignedDate);
     } finally {
       setIsEditing(false);
+    }
+  };
+
+  const handleDescriptionChange = async () => {
+    if (newDescription === description) {
+      setIsEditingDescription(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ description: newDescription })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      if (onEdit) {
+        onEdit();
+      }
+    } catch (error) {
+      console.error('Error updating description:', error);
+      setNewDescription(description);
+    } finally {
+      setIsEditingDescription(false);
+    }
+  };
+
+  const handleAmountChange = async () => {
+    if (parseFloat(newAmount) === Math.abs(amount)) {
+      setIsEditingAmount(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          amount:
+            amount < 0
+              ? -Math.abs(parseFloat(newAmount))
+              : Math.abs(parseFloat(newAmount)),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      if (onEdit) {
+        onEdit();
+      }
+    } catch (error) {
+      console.error('Error updating amount:', error);
+      setNewAmount(Math.abs(amount).toString());
+    } finally {
+      setIsEditingAmount(false);
+    }
+  };
+
+  const handleAccountChange = async (newAccountId: string) => {
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ account_id: newAccountId })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      if (onEdit) {
+        onEdit();
+      }
+    } catch (error) {
+      console.error('Error updating account:', error);
+    } finally {
+      setIsEditingAccount(false);
     }
   };
 
@@ -100,9 +203,6 @@ export function TransactionItem({
     }
   };
 
-  const Icon = accountIcon ? getAccountIcon(accountIcon) : null;
-  const datesAreDifferent = !isEqual(parseISO(date), parseISO(assignedDate));
-
   return (
     <>
       <div className="flex items-center py-2 text-sm">
@@ -110,9 +210,45 @@ export function TransactionItem({
         <div className="flex items-center gap-4 w-[400px] flex-shrink-0">
           {/* Account section - fixed width */}
           <div className="w-[200px] flex items-center gap-2">
-            {Icon && <Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />}
-            {accountName && (
-              <span className="text-gray-600 truncate">{accountName}</span>
+            {isEditingAccount ? (
+              <select
+                value={account_id}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                onBlur={() => setIsEditingAccount(false)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                autoFocus
+              >
+                <optgroup label="Bank Accounts">
+                  {accounts
+                    .filter((a) => a.type === 'bank')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Credit Cards">
+                  {accounts
+                    .filter((a) => a.type === 'credit')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+            ) : (
+              <button
+                onClick={() => setIsEditingAccount(true)}
+                className="flex items-center gap-2 hover:bg-gray-100 rounded px-2 py-1"
+              >
+                {Icon && (
+                  <Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                )}
+                {accountName && (
+                  <span className="text-gray-600 truncate">{accountName}</span>
+                )}
+              </button>
             )}
           </div>
 
@@ -134,7 +270,9 @@ export function TransactionItem({
                 autoFocus
               />
             ) : (
-              <span className={`text-gray-700 ${datesAreDifferent ? 'italic' : ''}`}>
+              <span
+                className={`text-gray-700 ${datesAreDifferent ? 'italic' : ''}`}
+              >
                 {format(parseISO(assignedDate), 'PPP')}
               </span>
             )}
@@ -143,20 +281,64 @@ export function TransactionItem({
 
         {/* Flexible-width section for description */}
         <div className="flex-1 min-w-0 px-4">
-          <div className="truncate">
-            <span className="font-medium text-gray-900">{description}</span>
-            {categoryName && (
-              <span className="text-gray-500 ml-2">• {categoryName}</span>
-            )}
-            {allocationName && (
-              <span className="text-purple-600 ml-2">• {allocationName}</span>
-            )}
-          </div>
+          {isEditingDescription ? (
+            <input
+              type="text"
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              onBlur={handleDescriptionChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleDescriptionChange();
+                }
+              }}
+              className="w-full border rounded px-2 py-1 text-sm"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => setIsEditingDescription(true)}
+              className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
+            >
+              <div className="truncate">
+                <span className="font-medium text-gray-900">{description}</span>
+                {categoryName && (
+                  <span className="text-gray-500 ml-2">• {categoryName}</span>
+                )}
+                {allocationName && (
+                  <span className="text-purple-600 ml-2">
+                    • {allocationName}
+                  </span>
+                )}
+              </div>
+            </button>
+          )}
         </div>
 
         {/* Fixed-width section for amount and actions */}
         <div className="flex items-center gap-4 w-[200px] flex-shrink-0 justify-end">
-          <Amount value={amount} />
+          {isEditingAmount ? (
+            <input
+              type="number"
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value)}
+              onBlur={handleAmountChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAmountChange();
+                }
+              }}
+              className="w-24 border rounded px-2 py-1 text-sm text-right"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => setIsEditingAmount(true)}
+              className="hover:bg-gray-100 rounded px-2 py-1"
+            >
+              <Amount value={amount} />
+            </button>
+          )}
           <button
             onClick={() => setIsEditModalOpen(true)}
             className="text-gray-600 hover:text-gray-800"
