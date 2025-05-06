@@ -44,9 +44,10 @@ export function TransactionItem({
   const [newAssignedDate, setNewAssignedDate] = useState(assignedDate);
   const [editFormData, setEditFormData] = useState({
     description,
-    amount: amount.toString(),
+    amount: Math.abs(amount).toString(),
     date,
     account_id: account_id || '',
+    transactionType: amount < 0 ? 'spending' : ('deposit' as 'spending' | 'deposit'),
   });
 
   const handleDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,7 +80,10 @@ export function TransactionItem({
         .from('transactions')
         .update({
           description: editFormData.description,
-          amount: parseFloat(editFormData.amount),
+          amount:
+            editFormData.transactionType === 'spending'
+              ? -Math.abs(parseFloat(editFormData.amount))
+              : Math.abs(parseFloat(editFormData.amount)),
           date: editFormData.date,
           account_id: editFormData.account_id,
         })
@@ -101,17 +105,22 @@ export function TransactionItem({
 
   return (
     <>
-      <div className="flex items-center justify-between py-2 text-sm">
-        <div className="flex items-center gap-4">
-          {Icon && (
-            <div className="text-gray-500">
-              <Icon className="w-5 h-5" />
-            </div>
-          )}
-          <div className="flex items-center gap-2">
+      <div className="flex items-center py-2 text-sm">
+        {/* Fixed-width section for account and date */}
+        <div className="flex items-center gap-4 w-[400px] flex-shrink-0">
+          {/* Account section - fixed width */}
+          <div className="w-[200px] flex items-center gap-2">
+            {Icon && <Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />}
+            {accountName && (
+              <span className="text-gray-600 truncate">{accountName}</span>
+            )}
+          </div>
+
+          {/* Date section - fixed width */}
+          <div className="w-[200px] flex items-center gap-2">
             <button
               onClick={() => setIsEditing(!isEditing)}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
             >
               <Calendar className="w-4 h-4 text-gray-400" />
             </button>
@@ -130,11 +139,12 @@ export function TransactionItem({
               </span>
             )}
           </div>
-          <div>
+        </div>
+
+        {/* Flexible-width section for description */}
+        <div className="flex-1 min-w-0 px-4">
+          <div className="truncate">
             <span className="font-medium text-gray-900">{description}</span>
-            {accountName && (
-              <span className="text-gray-500 ml-2">• {accountName}</span>
-            )}
             {categoryName && (
               <span className="text-gray-500 ml-2">• {categoryName}</span>
             )}
@@ -143,7 +153,9 @@ export function TransactionItem({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-4">
+
+        {/* Fixed-width section for amount and actions */}
+        <div className="flex items-center gap-4 w-[200px] flex-shrink-0 justify-end">
           <Amount value={amount} />
           <button
             onClick={() => setIsEditModalOpen(true)}

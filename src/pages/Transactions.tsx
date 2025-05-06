@@ -119,7 +119,6 @@ export function Transactions() {
   };
 
   const applyFilters = () => {
-    console.log('applyFilters', allTransactions);
     let filteredTransactions = [...allTransactions];
     const now = new Date();
 
@@ -176,7 +175,6 @@ export function Transactions() {
         });
         break;
       case 'custom':
-        console.log('customFilter', customFilter);
         filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return (
@@ -186,8 +184,6 @@ export function Transactions() {
         });
         break;
     }
-
-    console.log('applyFilters', filteredTransactions);
 
     filteredTransactions.sort(sortTransactions);
     const groupedData = groupTransactionsByDate(filteredTransactions);
@@ -369,7 +365,7 @@ export function Transactions() {
   };
 
   const { years, months } = availableYearsMonths;
-  console.log({ years, months });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -520,6 +516,7 @@ export function Transactions() {
                                     date={transaction.date}
                                     assignedDate={transaction.assigned_date}
                                     categoryName={transaction.category?.name}
+                                    account_id={transaction.account_id}
                                     accountName={transaction.account?.name}
                                     accountIcon={transaction.account?.icon}
                                     onDelete={handleDelete}

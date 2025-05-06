@@ -83,7 +83,10 @@ export function AddTransactionForm({
     e.preventDefault();
     // Convert amount based on transaction type
     const amount = parseFloat(formData.amount);
-    const adjustedAmount = formData.transactionType === 'spending' ? -Math.abs(amount) : Math.abs(amount);
+    const adjustedAmount =
+      formData.transactionType === 'spending'
+        ? -Math.abs(amount)
+        : Math.abs(amount);
     onChange({ amount: adjustedAmount.toString() });
     onSubmit(e);
   };
@@ -128,7 +131,13 @@ export function AddTransactionForm({
                     type="radio"
                     value="spending"
                     checked={formData.transactionType === 'spending'}
-                    onChange={(e) => onChange({ transactionType: e.target.value as 'spending' | 'deposit' })}
+                    onChange={(e) =>
+                      onChange({
+                        transactionType: e.target.value as
+                          | 'spending'
+                          | 'deposit',
+                      })
+                    }
                     className="form-radio text-indigo-600"
                   />
                   <span className="ml-2">Spending</span>
@@ -138,7 +147,13 @@ export function AddTransactionForm({
                     type="radio"
                     value="deposit"
                     checked={formData.transactionType === 'deposit'}
-                    onChange={(e) => onChange({ transactionType: e.target.value as 'spending' | 'deposit' })}
+                    onChange={(e) =>
+                      onChange({
+                        transactionType: e.target.value as
+                          | 'spending'
+                          | 'deposit',
+                      })
+                    }
                     className="form-radio text-indigo-600"
                   />
                   <span className="ml-2">Deposit</span>

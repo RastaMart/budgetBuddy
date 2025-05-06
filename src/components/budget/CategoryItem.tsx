@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus, ChevronRight, ChevronDown, ArrowDownToLine } from 'lucide-react';
+import {
+  Trash2,
+  Plus,
+  ChevronRight,
+  ChevronDown,
+  ArrowDownToLine,
+} from 'lucide-react';
 import { ProgressBar } from './ProgressBar';
 import { Category } from '../../types/category';
 import { getTimeProgress } from '../../utils/timeProgress';
@@ -9,13 +15,7 @@ import { TransactionItem } from '../transaction/TransactionItem';
 import { DeleteTransactionModal } from '../transaction/DeleteTransactionModal';
 import { useAuth } from '../../hooks/useContext';
 import { supabase } from '../../lib/supabase';
-
-interface Transaction {
-  id: string;
-  amount: number;
-  description: string;
-  date: string;
-}
+import { Transaction } from '../../types/transaction';
 
 interface CategoryItemProps {
   category: Category;
@@ -32,7 +32,8 @@ export function CategoryItem({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isDistributing, setIsDistributing] = useState(false);
   const [distributedAmount, setDistributedAmount] = useState(0);
@@ -58,7 +59,7 @@ export function CategoryItem({
   }, [transactions]);
 
   async function calculateDistributedAmount() {
-    const distributedTransactions = transactions.filter(t => t.amount > 0);
+    const distributedTransactions = transactions.filter((t) => t.amount > 0);
     const total = distributedTransactions.reduce((sum, t) => sum + t.amount, 0);
     setDistributedAmount(total);
   }
@@ -67,7 +68,20 @@ export function CategoryItem({
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, amount, description, date')
+        .select(
+          `
+          id,
+          category_id,
+          amount,
+          description,
+          date,
+          assigned_date,
+          account_id,
+          type,
+          category:categories(name),
+          account:accounts(name, icon)
+          `
+        )
         .eq('category_id', category.id)
         .order('date', { ascending: false });
 
@@ -123,7 +137,7 @@ export function CategoryItem({
         .eq('id', selectedTransaction.id);
 
       if (error) throw error;
-      
+
       setShowDeleteModal(false);
       setSelectedTransaction(null);
       fetchTransactions();
@@ -136,17 +150,20 @@ export function CategoryItem({
   async function handleDistributeFunds() {
     try {
       setIsDistributing(true);
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/distribute-funds`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          budgetId: category.budget_id,
-          categoryId: category.id,
-        }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/distribute-funds`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            budgetId: category.budget_id,
+            categoryId: category.id,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const error = await response.json();
@@ -193,8 +210,8 @@ export function CategoryItem({
                   category.type === 'shared_income'
                     ? 'bg-purple-100 text-purple-700'
                     : category.type === 'income'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-600'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-600'
                 }`}
               >
                 {category.type === 'shared_income'
@@ -204,7 +221,8 @@ export function CategoryItem({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {(category.type === 'income' || category.type === 'shared_income') && (
+            {(category.type === 'income' ||
+              category.type === 'shared_income') && (
               <button
                 onClick={handleDistributeFunds}
                 disabled={isDistributing}
@@ -253,7 +271,11 @@ export function CategoryItem({
                   description={transaction.description}
                   amount={transaction.amount}
                   date={transaction.date}
-                  assignedDate={transaction.date}
+                  assignedDate={transaction.assigned_date}
+                  categoryName={transaction.category?.name}
+                  account_id={transaction.account_id}
+                  accountName={transaction.account?.name}
+                  accountIcon={transaction.account?.icon}
                   onDelete={() => handleDeleteTransaction(transaction)}
                 />
               ))
