@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useContext';
-import { Plus, ChevronDown, ChevronRight, Filter } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { TransactionItem } from '../components/transaction/TransactionItem';
 import { Modal } from '../components/shared/Modal';
 import { AddTransactionForm } from '../components/transaction/AddTransactionForm';
+import { Card } from '../components/shared/Card';
+import { FilterBar } from '../components/shared/FilterBar';
+import { LoadingSpinner } from '../components/shared/LoadingSpinner';
+import { EmptyState } from '../components/shared/EmptyState';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import {
   format,
@@ -16,35 +20,9 @@ import {
   subDays,
   endOfDay,
 } from 'date-fns';
-
-interface Transaction {
-  id: string;
-  category_id: string | null;
-  amount: number;
-  description: string;
-  date: string;
-  assigned_date: string;
-  type: 'account' | 'virtual' | 'income_distribution';
-  account_id: string | null;
-  category?: {
-    name: string;
-  } | null;
-  account?: {
-    name: string;
-    icon: string;
-  } | null;
-}
-
-interface Category {
-  id: string;
-  name: string;
-}
-
-interface Account {
-  id: string;
-  name: string;
-  type: 'bank' | 'credit';
-}
+import { useFilters } from '../hooks/useFilters';
+import { Transaction } from '../types/transaction';
+import { Account } from '../types/account';
 
 interface GroupedTransactions {
   [year: string]: {
@@ -64,29 +42,24 @@ export function Transactions() {
   const [transactions, setTransactions] = useState<GroupedTransactions>({});
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [filterType, setFilterType] = useState<FilterType>('recent');
-  const [customFilter, setCustomFilter] = useState({
-    year: null,
-    month: null,
-  });
-  const [availableYearsMonths, setAvailableYearsMonths] = useState<{
-    years: string[];
-    months: string[];
-  }>({
-    years: [],
-    months: [],
-  });
+
+  const { filters, updateFilter } = useFilters([
+    { type: 'account', value: 'all' },
+    { type: 'period', value: 'recent' },
+    { type: 'year', value: new Date().getFullYear().toString() },
+    { type: 'month', value: format(new Date(), 'MMMM') },
+  ]);
 
   const [formData, setFormData] = useState({
     category_id: '',
     amount: '',
     description: '',
     date: toZonedTime(new Date(), profile?.timezone || 'UTC'),
+    transactionType: 'spending' as 'spending' | 'deposit',
   });
 
   useEffect(() => {
@@ -97,15 +70,36 @@ export function Transactions() {
 
   useEffect(() => {
     if (allTransactions.length > 0) {
-      const { years: newYears, months: newMonths } =
-        getAvailableYearsAndMonths();
-      setAvailableYearsMonths({ years: newYears, months: newMonths });
-      if (customFilter.year === null && customFilter.month === null) {
-        setCustomFilter({ year: newYears[0], month: newMonths[0] });
-      }
       applyFilters();
     }
-  }, [filterType, customFilter, selectedAccount, allTransactions]);
+  }, [filters, allTransactions]);
+
+  const filterOptions = {
+    account: [
+      { value: 'all', label: 'All Accounts' },
+      ...accounts
+        .filter((a) => a.type === 'bank')
+        .map((a) => ({ value: a.id, label: a.name })),
+      ...accounts
+        .filter((a) => a.type === 'credit')
+        .map((a) => ({ value: a.id, label: a.name })),
+    ],
+    period: [
+      { value: 'recent', label: 'Recent (31 days)' },
+      { value: 'current-month', label: 'Current Month' },
+      { value: 'last-month', label: 'Last Month' },
+      { value: 'last-3-months', label: 'Last 3 Months' },
+      { value: 'custom', label: 'Custom' },
+    ],
+    year: allTransactions
+      .map((t) => parseISO(t.assigned_date).getFullYear().toString())
+      .filter((value, index, self) => self.indexOf(value) === index)
+      .sort((a, b) => Number(b) - Number(a))
+      .map((year) => ({ value: year, label: year })),
+    month: Array.from(
+      new Set(allTransactions.map((t) => format(parseISO(t.assigned_date), 'MMMM')))
+    ).map((month) => ({ value: month, label: month })),
+  };
 
   const sortTransactions = (a: Transaction, b: Transaction) => {
     const dateA = parseISO(a.assigned_date);
@@ -122,19 +116,19 @@ export function Transactions() {
     let filteredTransactions = [...allTransactions];
     const now = new Date();
 
-    // Filter out income_distribution transactions
     filteredTransactions = filteredTransactions.filter(
       (t) => t.type !== 'income_distribution'
     );
 
-    // Apply account filter
-    if (selectedAccount !== 'all') {
+    const accountFilter = filters.find((f) => f.type === 'account')?.value;
+    if (accountFilter !== 'all') {
       filteredTransactions = filteredTransactions.filter(
-        (t) => t.account_id === selectedAccount
+        (t) => t.account_id === accountFilter
       );
     }
 
-    switch (filterType) {
+    const periodFilter = filters.find((f) => f.type === 'period')?.value as FilterType;
+    switch (periodFilter) {
       case 'recent':
         const thirtyOneDaysAgo = subDays(now, 31);
         filteredTransactions = filteredTransactions.filter((t) => {
@@ -175,11 +169,13 @@ export function Transactions() {
         });
         break;
       case 'custom':
+        const yearFilter = filters.find((f) => f.type === 'year')?.value;
+        const monthFilter = filters.find((f) => f.type === 'month')?.value;
         filteredTransactions = filteredTransactions.filter((t) => {
           const date = parseISO(t.assigned_date);
           return (
-            date.getFullYear().toString() === customFilter.year &&
-            format(date, 'MMMM') === customFilter.month
+            date.getFullYear().toString() === yearFilter &&
+            format(date, 'MMMM') === monthFilter
           );
         });
         break;
@@ -310,6 +306,7 @@ export function Transactions() {
         amount: '',
         description: '',
         date: toZonedTime(new Date().toISOString(), profile?.timezone || 'UTC'),
+        transactionType: 'spending',
       });
 
       setShowTransactionModal(false);
@@ -333,38 +330,13 @@ export function Transactions() {
     }
   }
 
-  const handleModalClose = () => {
-    setShowTransactionModal(false);
-    fetchTransactions();
-  };
-
-  const toggleYearExpand = (year: string) => {
-    const newExpanded = new Set(expandedGroups);
-    if (newExpanded.has(year)) {
-      newExpanded.delete(year);
-    } else {
-      newExpanded.add(year);
-    }
-    setExpandedGroups(newExpanded);
-  };
-
-  const getAvailableYearsAndMonths = () => {
-    const years = Array.from(
-      new Set(
-        allTransactions.map((t) =>
-          parseISO(t.assigned_date).getFullYear().toString()
-        )
-      )
-    ).sort((a, b) => b - a);
-    const months = Array.from(
-      new Set(
-        allTransactions.map((t) => format(parseISO(t.assigned_date), 'MMMM'))
-      )
+  if (isLoading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
     );
-    return { years, months };
-  };
-
-  const { years, months } = availableYearsMonths;
+  }
 
   return (
     <div className="space-y-6">
@@ -379,166 +351,110 @@ export function Transactions() {
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          <Filter className="w-5 h-5 text-gray-500" />
+      <Card>
+        <FilterBar
+          filters={[
+            {
+              id: 'account',
+              label: 'Account',
+              options: filterOptions.account,
+              value: filters.find((f) => f.type === 'account')?.value || 'all',
+              onChange: (value) => updateFilter('account', value),
+            },
+            {
+              id: 'period',
+              label: 'Period',
+              options: filterOptions.period,
+              value: filters.find((f) => f.type === 'period')?.value || 'recent',
+              onChange: (value) => updateFilter('period', value),
+            },
+            ...(filters.find((f) => f.type === 'period')?.value === 'custom'
+              ? [
+                  {
+                    id: 'year',
+                    label: 'Year',
+                    options: filterOptions.year,
+                    value:
+                      filters.find((f) => f.type === 'year')?.value ||
+                      new Date().getFullYear().toString(),
+                    onChange: (value) => updateFilter('year', value),
+                  },
+                  {
+                    id: 'month',
+                    label: 'Month',
+                    options: filterOptions.month,
+                    value:
+                      filters.find((f) => f.type === 'month')?.value ||
+                      format(new Date(), 'MMMM'),
+                    onChange: (value) => updateFilter('month', value),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </Card>
 
-          <select
-            value={selectedAccount}
-            onChange={(e) => setSelectedAccount(e.target.value)}
-            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-          >
-            <option value="all">All Accounts</option>
-            <optgroup label="Bank Accounts">
-              {accounts
-                .filter((a) => a.type === 'bank')
-                .map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-            </optgroup>
-            <optgroup label="Credit Cards">
-              {accounts
-                .filter((a) => a.type === 'credit')
-                .map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-            </optgroup>
-          </select>
-
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as FilterType)}
-            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-          >
-            <option value="recent">Recent (31 days)</option>
-            <option value="current-month">Current Month</option>
-            <option value="last-month">Last Month</option>
-            <option value="last-3-months">Last 3 Months</option>
-            <option value="custom">Custom</option>
-          </select>
-
-          {filterType === 'custom' && (
-            <div className="flex gap-2">
-              <select
-                value={customFilter.year}
-                onChange={(e) =>
-                  setCustomFilter({ ...customFilter, year: e.target.value })
-                }
-                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                {years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={customFilter.month}
-                onChange={(e) =>
-                  setCustomFilter({ ...customFilter, month: e.target.value })
-                }
-                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                {months.map((month) => (
-                  <option key={month} value={month}>
-                    {month}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="min-w-full divide-y divide-gray-200">
-          <div className="bg-gray-50 px-6 py-3">
-            <h2 className="text-lg font-medium text-gray-900">
-              Transaction History
-            </h2>
-          </div>
-          {isLoading ? (
-            <div className="p-6 text-center text-gray-500">
-              Loading transactions...
-            </div>
-          ) : Object.keys(transactions).length === 0 ? (
-            <div className="p-6 text-center text-gray-500">
-              No transactions found
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {Object.entries(transactions)
-                .sort(([yearA], [yearB]) => Number(yearB) - Number(yearA))
-                .map(([year, months]) => (
-                  <div key={year} className="bg-white">
-                    <button
-                      onClick={() => toggleYearExpand(year)}
-                      className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50"
-                    >
-                      <span className="text-lg font-medium text-gray-900">
-                        {year}
-                      </span>
-                      {expandedGroups.has(year) ? (
-                        <ChevronDown className="w-5 h-5 text-gray-500" />
-                      ) : (
-                        <ChevronRight className="w-5 h-5 text-gray-500" />
-                      )}
-                    </button>
-                    {expandedGroups.has(year) && (
-                      <div className="divide-y divide-gray-100">
-                        {Object.entries(months)
-                          .sort(([monthA], [monthB]) => {
-                            const dateA = new Date(`${monthA} 1, ${year}`);
-                            const dateB = new Date(`${monthB} 1, ${year}`);
-                            return dateB.getTime() - dateA.getTime();
-                          })
-                          .map(([month, monthTransactions]) => (
-                            <div
-                              key={`${year}-${month}`}
-                              className="bg-gray-50"
-                            >
-                              <div className="px-6 py-2 bg-gray-100">
-                                <h3 className="text-sm font-medium text-gray-700">
-                                  {month}
-                                </h3>
-                              </div>
-                              <div className="divide-y divide-gray-200 px-6">
-                                {monthTransactions.map((transaction) => (
-                                  <TransactionItem
-                                    key={transaction.id}
-                                    id={transaction.id}
-                                    description={transaction.description}
-                                    amount={transaction.amount}
-                                    date={transaction.date}
-                                    assignedDate={transaction.assigned_date}
-                                    categoryName={transaction.category?.name}
-                                    account_id={transaction.account_id}
-                                    accountName={transaction.account?.name}
-                                    accountIcon={transaction.account?.icon}
-                                    onDelete={handleDelete}
-                                    onAssignedDateChange={fetchTransactions}
-                                    onEdit={fetchTransactions}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
+      <Card title="Transaction History">
+        {Object.keys(transactions).length === 0 ? (
+          <EmptyState
+            title="No transactions found"
+            description="Add your first transaction to get started"
+            action={{
+              label: 'Add Transaction',
+              onClick: () => setShowTransactionModal(true),
+            }}
+          />
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {Object.entries(transactions)
+              .sort(([yearA], [yearB]) => Number(yearB) - Number(yearA))
+              .map(([year, months]) => (
+                <div key={year} className="bg-white">
+                  <div className="divide-y divide-gray-100">
+                    {Object.entries(months)
+                      .sort(([monthA], [monthB]) => {
+                        const dateA = new Date(`${monthA} 1, ${year}`);
+                        const dateB = new Date(`${monthB} 1, ${year}`);
+                        return dateB.getTime() - dateA.getTime();
+                      })
+                      .map(([month, monthTransactions]) => (
+                        <div key={`${year}-${month}`} className="bg-gray-50">
+                          <div className="px-6 py-2 bg-gray-100">
+                            <h3 className="text-sm font-medium text-gray-700">
+                              {month} {year}
+                            </h3>
+                          </div>
+                          <div className="divide-y divide-gray-200 px-6">
+                            {monthTransactions.map((transaction) => (
+                              <TransactionItem
+                                key={transaction.id}
+                                id={transaction.id}
+                                description={transaction.description}
+                                amount={transaction.amount}
+                                date={transaction.date}
+                                assignedDate={transaction.assigned_date}
+                                categoryName={transaction.category?.name}
+                                account_id={transaction.account_id}
+                                accountName={transaction.account?.name}
+                                accountIcon={transaction.account?.icon}
+                                onDelete={handleDelete}
+                                onAssignedDateChange={fetchTransactions}
+                                onEdit={fetchTransactions}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                   </div>
-                ))}
-            </div>
-          )}
-        </div>
-      </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </Card>
 
       <Modal
         isOpen={showTransactionModal}
-        onClose={handleModalClose}
+        onClose={() => setShowTransactionModal(false)}
         title="Add Transaction"
         size="full"
       >
@@ -547,7 +463,7 @@ export function Transactions() {
           onSubmit={handleSubmit}
           onChange={(data) => setFormData({ ...formData, ...data })}
           categories={categories}
-          onClose={handleModalClose}
+          onClose={() => setShowTransactionModal(false)}
         />
       </Modal>
     </div>
