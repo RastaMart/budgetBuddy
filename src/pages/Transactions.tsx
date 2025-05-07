@@ -347,9 +347,10 @@ export function Transactions() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const amount = formData.transactionType === 'spending' 
-        ? -Math.abs(parseFloat(formData.amount))
-        : Math.abs(parseFloat(formData.amount));
+      const amount =
+        formData.transactionType === 'spending'
+          ? -Math.abs(parseFloat(formData.amount))
+          : Math.abs(parseFloat(formData.amount));
 
       const { error } = await supabase.from('transactions').insert({
         user_id: user.id,
@@ -378,6 +379,10 @@ export function Transactions() {
     } catch (error) {
       console.error('Error adding transaction:', error);
     }
+  }
+
+  function handleBulkImport(data: Transaction[]) {
+    fetchTransactions();
   }
 
   async function handleDelete(id: string) {
@@ -461,6 +466,7 @@ export function Transactions() {
         <AddTransactionForm
           formData={formData}
           onSubmit={handleSubmit}
+          onBulkImport={handleBulkImport}
           onChange={(data) => setFormData({ ...formData, ...data })}
           onClose={() => setShowTransactionModal(false)}
         />

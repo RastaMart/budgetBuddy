@@ -293,20 +293,28 @@ export function CSVImport({
     };
 
     const selectedCSVTransactions = transactions.filter((t) => t.selected);
-
+    const newTransactions: Transaction[] = [];
     for (const transaction of selectedCSVTransactions) {
       try {
-        const { error } = await supabase.from('transactions').insert({
-          user_id: user.id,
-          amount: parseFloat(transaction.amount),
-          description: transaction.description,
-          date: transaction.date,
-          assigned_date: transaction.date,
-          account_id: selectedAccount,
-          type: 'account',
-        });
+        const { data, error } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            amount: parseFloat(transaction.amount),
+            description: transaction.description,
+            date: transaction.date,
+            assigned_date: transaction.date,
+            account_id: selectedAccount,
+            type: 'account',
+          })
+          .select();
 
+        console.log('error', error, transaction);
         if (error) throw error;
+
+        if (data && data.length > 0) {
+          newTransactions.push(data[0] as Transaction);
+        }
         stats.successful++;
       } catch (error) {
         stats.failed++;
@@ -321,19 +329,8 @@ export function CSVImport({
     setImportStats(stats);
     setMappingStep('complete');
 
-    const selectedTransactions: Transaction[] = selectedCSVTransactions.map(
-      (t) =>
-        ({
-          user_id: user.id,
-          amount: parseFloat(t.amount),
-          description: t.description,
-          date: t.date,
-          assigned_date: t.date,
-          account_id: selectedAccount,
-          type: 'account',
-        }) as unknown as Transaction
-    );
-    onTransactionsLoaded(selectedTransactions);
+    onTransactionsLoaded(newTransactions);
+    console.log('importTransactions done');
   };
 
   const renderColumnSelection = (title: string, description: string) => (
@@ -521,7 +518,8 @@ export function CSVImport({
               <button
                 onClick={() => importTransactions(parsedTransactions)}
                 disabled={
-                  !parsedTransactions.some((t) => t.selected) || !selectedAccount
+                  !parsedTransactions.some((t) => t.selected) ||
+                  !selectedAccount
                 }
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >

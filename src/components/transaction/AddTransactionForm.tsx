@@ -96,7 +96,8 @@ export function AddTransactionForm({
         .single();
 
       if (error) {
-        if (error.code !== 'PGRST116') { // Not Found error
+        if (error.code !== 'PGRST116') {
+          // Not Found error
           console.error('Error checking transaction rule:', error);
         }
         return;
@@ -124,19 +125,19 @@ export function AddTransactionForm({
 
   const handleBulkImport = async (transactions: Transaction[]) => {
     // Check rules for each transaction
+    console.log('handleBulkImport', transactions);
     const processedTransactions = await Promise.all(
       transactions.map(async (transaction) => {
-        const { data: rule } = await supabase
-          .from('transaction_rules')
+        const { data: t, error } = await supabase
+          .from('transactions')
           .select('category_id')
-          .eq('user_id', user?.id)
-          .eq('account_id', transaction.account_id)
-          .eq('description', transaction.description)
+          .eq('id', transaction.id)
           .single();
-
+        if (error) throw error;
+        console.log('t', t);
         return {
           ...transaction,
-          category_id: rule?.category_id || null,
+          category_id: t?.category_id || null,
         };
       })
     );
