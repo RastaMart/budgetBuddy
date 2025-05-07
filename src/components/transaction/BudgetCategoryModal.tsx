@@ -44,7 +44,9 @@ export function BudgetCategoryModal({
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null
+  );
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [sameDescriptionCount, setSameDescriptionCount] = useState(0);
@@ -77,9 +79,9 @@ export function BudgetCategoryModal({
 
   async function fetchBudgets() {
     try {
-      const { data: budgetsData, error: budgetsError } = await supabase
-        .from('budgets')
-        .select(`
+      const { data: budgetsData, error: budgetsError } = await supabase.from(
+        'budgets'
+      ).select(`
           id,
           name,
           categories (
@@ -92,10 +94,15 @@ export function BudgetCategoryModal({
       if (budgetsError) throw budgetsError;
 
       // Sort budgets alphabetically
-      const sortedBudgets = budgetsData?.map(budget => ({
-        ...budget,
-        categories: [...budget.categories].sort((a, b) => a.name.localeCompare(b.name))
-      })).sort((a, b) => a.name.localeCompare(b.name)) || [];
+      const sortedBudgets =
+        budgetsData
+          ?.map((budget) => ({
+            ...budget,
+            categories: [...budget.categories].sort((a, b) =>
+              a.name.localeCompare(b.name)
+            ),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name)) || [];
 
       setBudgets(sortedBudgets);
 
@@ -181,15 +188,18 @@ export function BudgetCategoryModal({
         try {
           const { error: ruleError } = await supabase
             .from('transaction_rules')
-            .upsert({
-              user_id: user?.id,
-              account_id: account_id,
-              description: description,
-              category_id: selectedCategoryId,
-            }, {
-              onConflict: 'user_id,account_id,description',
-              ignoreDuplicates: false
-            });
+            .upsert(
+              {
+                user_id: user?.id,
+                account_id: account_id,
+                description: description,
+                category_id: selectedCategoryId,
+              },
+              {
+                onConflict: 'user_id,account_id,description',
+                ignoreDuplicates: false,
+              }
+            );
 
           if (ruleError) throw ruleError;
         } catch (error) {
@@ -283,7 +293,8 @@ export function BudgetCategoryModal({
                   Back
                 </button>
                 <h3 className="text-lg font-medium text-gray-900 ml-4">
-                  Categorize transaction "{description}" to {selectedBudget?.name} - {selectedCategory?.name}
+                  Categorize transaction "{description}" to{' '}
+                  {selectedBudget?.name} - {selectedCategory?.name}
                 </h3>
               </div>
 
@@ -297,7 +308,10 @@ export function BudgetCategoryModal({
                       onChange={(e) => setSaveAsRule(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <label htmlFor="saveRule" className="ml-2 block text-sm text-gray-900">
+                    <label
+                      htmlFor="saveRule"
+                      className="ml-2 block text-sm text-gray-900"
+                    >
                       Save as a rule for future transactions
                     </label>
                   </div>
@@ -323,7 +337,8 @@ export function BudgetCategoryModal({
                           onClick={() => handleApply('unassigned')}
                           className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                         >
-                          Apply to all uncategorized transactions ({unAssignedCount})
+                          Apply to all uncategorized transactions (
+                          {unAssignedCount})
                         </button>
                       )}
                       {sameDescriptionCount > 1 && (
