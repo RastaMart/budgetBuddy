@@ -420,6 +420,7 @@ export function TransactionItem({
         description={description}
         onSelect={handleCategoryUpdate}
         currentCategoryId={category_id}
+        account_id={account_id}
       />
     </>
   );

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../hooks/useContext';
 import { supabase } from '../lib/supabase';
+import { TransactionRules } from '../components/settings/TransactionRules';
 
 export function Settings() {
   const { user, profile } = useAuth();
@@ -62,9 +63,13 @@ export function Settings() {
             </div>
 
             {message && (
-              <div className={`rounded-md p-4 ${
-                message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-              }`}>
+              <div 
+                className={`rounded-md p-4 ${
+                  message.type === 'success' 
+                    ? 'bg-green-50 text-green-700' 
+                    : 'bg-red-50 text-red-700'
+                }`}
+              >
                 {message.text}
               </div>
             )}
@@ -74,6 +79,10 @@ export function Settings() {
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <TransactionRules />
       </div>
     </div>
   );

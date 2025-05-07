@@ -22,11 +22,11 @@ import {
   createBudget,
   deleteBudget,
   fetchBudgetUsers,
-  shareBudgetWithUser,
   fetchCategories,
   createCategory,
   deleteCategory,
   updateBudgetOrder,
+  shareBudgetWithUser,
 } from '../services/budgetService';
 
 export function Budgets() {
@@ -82,12 +82,14 @@ export function Budgets() {
     yearly: 'Yearly',
   };
 
-  const incomeCategories = categories.filter(
-    (cat) => cat.type === 'income' || cat.type === 'shared_income'
-  );
-  const spendingCategories = categories.filter(
-    (cat) => cat.type === 'spending'
-  );
+  // Sort categories alphabetically within their types
+  const incomeCategories = categories
+    .filter((cat) => cat.type === 'income' || cat.type === 'shared_income')
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const spendingCategories = categories
+    .filter((cat) => cat.type === 'spending')
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const incomeTotals = incomeCategories.reduce(
     (acc, cat) => ({

@@ -1,33 +1,40 @@
 import React from 'react';
 import { Modal } from '../shared/Modal';
-import { Amount } from '../shared/Amount';
 
-interface DeleteTransactionModalProps {
+interface TransactionRule {
+  id: string;
+  description: string;
+  account_id: string;
+  accounts: {
+    name: string;
+  };
+  categories: {
+    name: string;
+    budgets: {
+      name: string;
+    };
+  };
+}
+
+interface DeleteRuleModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  description: string;
-  amount: number;
+  rule: TransactionRule;
 }
 
-export function DeleteTransactionModal({
-  isOpen,
-  onClose,
-  onConfirm,
-  description,
-  amount,
-}: DeleteTransactionModalProps) {
+export function DeleteRuleModal({ isOpen, onClose, onConfirm, rule }: DeleteRuleModalProps) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Delete Transaction">
+    <Modal isOpen={isOpen} onClose={onClose} title="Delete Rule">
       <div className="space-y-4">
         <p className="text-sm text-gray-500">
-          Are you sure you want to delete this transaction?
+          Are you sure you want to delete this rule?
         </p>
         
         <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="font-medium">{description}</div>
+          <div className="font-medium">{rule.description}</div>
           <div className="text-sm text-gray-500">
-            <Amount value={amount} />
+            {rule.accounts.name} → {rule.categories?.budgets?.name} - {rule.categories?.name}
           </div>
         </div>
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, ArrowLeft } from 'lucide-react';
 import { Modal } from '../shared/Modal';
-import { AddCategoryForm } from '../budget/AddCategoryForm';
+import { Plus, ArrowLeft, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
+import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { AddCategoryForm } from '../budget/AddCategoryForm';
 
 interface Budget {
   id: string;
@@ -26,6 +27,8 @@ interface BudgetCategoryModalProps {
     applyTo: 'single' | 'unassigned' | 'all'
   ) => void;
   currentCategoryId?: string;
+  account_id?: string;
+  skipConfirmation?: boolean;
 }
 
 export function BudgetCategoryModal({
@@ -34,18 +37,19 @@ export function BudgetCategoryModal({
   description,
   onSelect,
   currentCategoryId,
+  account_id,
+  skipConfirmation = false,
 }: BudgetCategoryModalProps) {
   const { user } = useAuth();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-    null
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [showCategorySelection, setShowCategorySelection] = useState(true);
   const [sameDescriptionCount, setSameDescriptionCount] = useState(0);
   const [unAssignedCount, setUnAssignedCount] = useState(0);
+  const [saveAsRule, setSaveAsRule] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
@@ -63,18 +67,19 @@ export function BudgetCategoryModal({
   useEffect(() => {
     if (isOpen) {
       fetchBudgets();
-      fetchCounts();
+      if (!skipConfirmation) {
+        fetchCounts();
+      }
       setShowCategorySelection(true);
+      setSaveAsRule(false);
     }
-  }, [isOpen, description]);
+  }, [isOpen, description, skipConfirmation]);
 
   async function fetchBudgets() {
-    console.log('fetchBudgets');
     try {
       const { data: budgetsData, error: budgetsError } = await supabase
         .from('budgets')
-        .select(
-          `
+        .select(`
           id,
           name,
           categories (
@@ -82,19 +87,20 @@ export function BudgetCategoryModal({
             name,
             budget_id
           )
-        `
-        )
-        .returns<Budget[]>();
+        `);
 
       if (budgetsError) throw budgetsError;
-      setBudgets(budgetsData || []);
 
-      // If there's a current category, find and select its budget
+      // Sort budgets alphabetically
+      const sortedBudgets = budgetsData?.map(budget => ({
+        ...budget,
+        categories: [...budget.categories].sort((a, b) => a.name.localeCompare(b.name))
+      })).sort((a, b) => a.name.localeCompare(b.name)) || [];
 
-      console.log('selectedCategoryId', selectedCategoryId);
-      console.log('currentCategoryId', currentCategoryId);
+      setBudgets(sortedBudgets);
+
       if (!selectedCategoryId && currentCategoryId) {
-        const category = budgetsData
+        const category = sortedBudgets
           ?.find((budget) =>
             budget.categories.some((cat) => cat.id === currentCategoryId)
           )
@@ -116,6 +122,7 @@ export function BudgetCategoryModal({
       const { count: countSame } = await supabase
         .from('transactions')
         .select('*', { count: 'exact', head: true })
+        .eq('account_id', account_id)
         .eq('description', description)
         .neq('type', 'income_distribution');
 
@@ -125,6 +132,7 @@ export function BudgetCategoryModal({
       const { count: countUnAssigned } = await supabase
         .from('transactions')
         .select('*', { count: 'exact', head: true })
+        .eq('account_id', account_id)
         .eq('description', description)
         .is('category_id', null)
         .neq('type', 'income_distribution');
@@ -150,7 +158,12 @@ export function BudgetCategoryModal({
 
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
-    setShowCategorySelection(false);
+    if (skipConfirmation) {
+      onSelect(categoryId, 'single');
+      onClose();
+    } else {
+      setShowCategorySelection(false);
+    }
   };
 
   const handleSuccess = (newCategories: Category[]) => {
@@ -161,8 +174,29 @@ export function BudgetCategoryModal({
     }
   };
 
-  const handleApply = (applyTo: 'single' | 'unassigned' | 'all') => {
-    if (selectedCategoryId) {
+  const handleApply = async (applyTo: 'single' | 'unassigned' | 'all') => {
+    if (selectedCategoryId && account_id) {
+      if (saveAsRule) {
+        // Save or update the rule using upsert
+        try {
+          const { error: ruleError } = await supabase
+            .from('transaction_rules')
+            .upsert({
+              user_id: user?.id,
+              account_id: account_id,
+              description: description,
+              category_id: selectedCategoryId,
+            }, {
+              onConflict: 'user_id,account_id,description',
+              ignoreDuplicates: false
+            });
+
+          if (ruleError) throw ruleError;
+        } catch (error) {
+          console.error('Error saving rule:', error);
+        }
+      }
+
       onSelect(selectedCategoryId, applyTo);
       onClose();
     }
@@ -240,51 +274,67 @@ export function BudgetCategoryModal({
             </>
           ) : (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 <button
                   onClick={() => setShowCategorySelection(true)}
                   className="flex items-center text-sm text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="w-4 h-4 mr-1" />
-                  Back to category selection
+                  Back
                 </button>
-                {selectedBudget && selectedCategory && (
-                  <div className="text-sm text-gray-600">
-                    <span className="font-medium">{selectedBudget.name}</span>
-                    <span className="mx-2">•</span>
-                    <span className="text-indigo-600">
-                      {selectedCategory.name}
-                    </span>
-                  </div>
-                )}
+                <h3 className="text-lg font-medium text-gray-900 ml-4">
+                  Categorize transaction "{description}" to {selectedBudget?.name} - {selectedCategory?.name}
+                </h3>
               </div>
 
               {selectedCategoryId && (
-                <div className="space-y-3">
-                  <button
-                    onClick={() => handleApply('single')}
-                    className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                  >
-                    Apply only to this transaction
-                  </button>
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="saveRule"
+                      checked={saveAsRule}
+                      onChange={(e) => setSaveAsRule(e.target.checked)}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="saveRule" className="ml-2 block text-sm text-gray-900">
+                      Save as a rule for future transactions
+                    </label>
+                  </div>
 
-                  {unAssignedCount > 1 && (
-                    <button
-                      onClick={() => handleApply('unassigned')}
-                      className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                    >
-                      Apply to all uncategorized &quot;{description}&quot;
-                      transactions ({unAssignedCount})
-                    </button>
-                  )}
-                  {sameDescriptionCount > 1 && (
+                  {saveAsRule ? (
                     <button
                       onClick={() => handleApply('all')}
                       className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                     >
-                      Apply to all &quot;{description}&quot; transactions (
-                      {sameDescriptionCount})
+                      Apply to all transactions ({sameDescriptionCount})
                     </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleApply('single')}
+                        className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                      >
+                        Apply only to this transaction
+                      </button>
+
+                      {unAssignedCount > 1 && (
+                        <button
+                          onClick={() => handleApply('unassigned')}
+                          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                        >
+                          Apply to all uncategorized transactions ({unAssignedCount})
+                        </button>
+                      )}
+                      {sameDescriptionCount > 1 && (
+                        <button
+                          onClick={() => handleApply('all')}
+                          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                        >
+                          Apply to all transactions ({sameDescriptionCount})
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}

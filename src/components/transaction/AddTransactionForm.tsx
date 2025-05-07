@@ -64,6 +64,12 @@ export function AddTransactionForm({
     fetchAccounts();
   }, [categories]);
 
+  useEffect(() => {
+    if (formData.account_id && formData.description) {
+      checkTransactionRule();
+    }
+  }, [formData.account_id, formData.description]);
+
   async function fetchAccounts() {
     try {
       const { data, error } = await supabase
@@ -79,6 +85,31 @@ export function AddTransactionForm({
     }
   }
 
+  async function checkTransactionRule() {
+    try {
+      const { data: rule, error } = await supabase
+        .from('transaction_rules')
+        .select('category_id')
+        .eq('user_id', user?.id)
+        .eq('account_id', formData.account_id)
+        .eq('description', formData.description)
+        .single();
+
+      if (error) {
+        if (error.code !== 'PGRST116') { // Not Found error
+          console.error('Error checking transaction rule:', error);
+        }
+        return;
+      }
+
+      if (rule) {
+        onChange({ category_id: rule.category_id });
+      }
+    } catch (error) {
+      console.error('Error checking transaction rule:', error);
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Convert amount based on transaction type
@@ -91,9 +122,27 @@ export function AddTransactionForm({
     onSubmit(e);
   };
 
-  const handleBulkImport = (transactions: Transaction[]) => {
+  const handleBulkImport = async (transactions: Transaction[]) => {
+    // Check rules for each transaction
+    const processedTransactions = await Promise.all(
+      transactions.map(async (transaction) => {
+        const { data: rule } = await supabase
+          .from('transaction_rules')
+          .select('category_id')
+          .eq('user_id', user?.id)
+          .eq('account_id', transaction.account_id)
+          .eq('description', transaction.description)
+          .single();
+
+        return {
+          ...transaction,
+          category_id: rule?.category_id || null,
+        };
+      })
+    );
+
     if (onBulkImport) {
-      onBulkImport(transactions);
+      onBulkImport(processedTransactions);
     }
     if (onClose) {
       onClose();
