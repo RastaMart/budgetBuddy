@@ -7,7 +7,7 @@ import { BulkDeleteModal } from './BulkDeleteModal';
 import { BudgetCategoryModal } from './BudgetCategoryModal';
 import { Account } from '../../types/account';
 import { supabase } from '../../lib/supabase';
-import { Calendar, Search } from 'lucide-react';
+import { Calendar, Search, X } from 'lucide-react';
 
 interface TransactionListProps {
   transactions: Record<string, Record<string, any[]>>;
@@ -198,9 +198,17 @@ export function TransactionList({
               placeholder="Search description..."
               value={filters.descriptionFilter}
               onChange={(e) => filters.setDescriptionFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full pl-10 pr-10 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
             <Search className="absolute left-3 top-2 h-4 w-4 text-gray-400" />
+            {filters.descriptionFilter && (
+              <button
+                onClick={() => filters.setDescriptionFilter('')}
+                className="absolute right-3 top-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 

@@ -10,10 +10,14 @@ export interface Transaction {
   date: string;
   assigned_date: string;
   type: TransactionType;
+  note?: string | null;
   created_at?: string;
   updated_at?: string;
   category?: {
     name: string;
+    budget?: {
+      name: string;
+    };
   };
   account?: {
     name: string;
@@ -36,4 +40,5 @@ export interface CreateTransactionInput {
   description: string;
   date: string;
   type: TransactionType;
+  note?: string;
 }

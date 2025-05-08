@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Calendar, Edit2 } from 'lucide-react';
+import { Trash2, Calendar, Edit2, StickyNote } from 'lucide-react';
 import { format, parseISO, isEqual } from 'date-fns';
 import { Amount } from '../shared/Amount';
 import { supabase } from '../../lib/supabase';
@@ -34,9 +34,11 @@ export function TransactionItem({
   const [isEditingAccount, setIsEditingAccount] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
   const [newAssignedDate, setNewAssignedDate] = useState(transaction.assigned_date);
   const [newDescription, setNewDescription] = useState(transaction.description);
   const [newAmount, setNewAmount] = useState(Math.abs(transaction.amount).toString());
+  const [newNote, setNewNote] = useState(transaction.note || '');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [editFormData, setEditFormData] = useState({
     description: transaction.description,
@@ -192,12 +194,30 @@ export function TransactionItem({
     }
   };
 
+  const handleNoteChange = async () => {
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ note: newNote || null })
+        .eq('id', transaction.id);
+
+      if (error) throw error;
+
+      if (onEdit) {
+        onEdit();
+      }
+      setShowNoteModal(false);
+    } catch (error) {
+      console.error('Error updating note:', error);
+      setNewNote(transaction.note || '');
+    }
+  };
+
   const handleCategoryUpdate = async (
     newCategoryId: string,
     applyTo: 'single' | 'unassigned' | 'all'
   ) => {
     try {
-      console.log('handleCategoryUpdate', newCategoryId, applyTo);
       const query = supabase.from('transactions');
 
       switch (applyTo) {
@@ -230,167 +250,181 @@ export function TransactionItem({
   };
 
   return (
-    <div 
-      className="flex items-center py-2 text-sm relative group"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="w-6 flex-shrink-0">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={onSelect}
-          className={`rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-opacity duration-200 ${
-            isHovered || isSelected ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-      </div>
-
-      <div className="flex items-center gap-4 w-[400px] flex-shrink-0">
-        <div className="w-[200px] flex items-center gap-2">
-          {isEditingAccount ? (
-            <select
-              value={transaction.account_id}
-              onChange={(e) => handleAccountChange(e.target.value)}
-              onBlur={() => setIsEditingAccount(false)}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              autoFocus
-            >
-              <optgroup label="Bank Accounts">
-                {accounts
-                  .filter((a) => a.type === 'bank')
-                  .map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Credit Cards">
-                {accounts
-                  .filter((a) => a.type === 'credit')
-                  .map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
-          ) : (
-            <button
-              onClick={() => setIsEditingAccount(true)}
-              className="flex items-center gap-2 hover:bg-gray-100 rounded px-2 py-1"
-            >
-              {Icon && (
-                <Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
-              )}
-              {transaction.account?.name && (
-                <span className="text-gray-600 truncate">{transaction.account.name}</span>
-              )}
-            </button>
-          )}
+    <div className="space-y-2">
+      <div 
+        className="flex items-center py-2 text-sm relative group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="w-6 flex-shrink-0">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onSelect}
+            className={`rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-opacity duration-200 ${
+              isHovered || isSelected ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
         </div>
 
-        <div className="w-[200px] flex items-center gap-2">
+        <div className="flex items-center gap-4 w-[400px] flex-shrink-0">
+          <div className="w-[200px] flex items-center gap-2">
+            {isEditingAccount ? (
+              <select
+                value={transaction.account_id}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                onBlur={() => setIsEditingAccount(false)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                autoFocus
+              >
+                <optgroup label="Bank Accounts">
+                  {accounts
+                    .filter((a) => a.type === 'bank')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Credit Cards">
+                  {accounts
+                    .filter((a) => a.type === 'credit')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+            ) : (
+              <button
+                onClick={() => setIsEditingAccount(true)}
+                className="flex items-center gap-2 hover:bg-gray-100 rounded px-2 py-1"
+              >
+                {Icon && (
+                  <Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                )}
+                {transaction.account?.name && (
+                  <span className="text-gray-600 truncate">{transaction.account.name}</span>
+                )}
+              </button>
+            )}
+          </div>
+
+          <div className="w-[200px] flex items-center gap-2">
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+            >
+              <Calendar className="w-4 h-4 text-gray-400" />
+            </button>
+            {isEditing ? (
+              <input
+                type="date"
+                value={newAssignedDate}
+                onChange={handleDateChange}
+                onBlur={() => setIsEditing(false)}
+                className="border rounded px-2 py-1 text-sm"
+                autoFocus
+              />
+            ) : (
+              <span
+                className={`text-gray-700 ${datesAreDifferent ? 'italic' : ''}`}
+              >
+                {format(parseISO(transaction.assigned_date), 'PPP')}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0 px-4">
+          <div className="flex items-center gap-2">
+            {isEditingDescription ? (
+              <input
+                type="text"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                onBlur={handleDescriptionChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleDescriptionChange();
+                  }
+                }}
+                className="w-full border rounded px-2 py-1 text-sm"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => setIsEditingDescription(true)}
+                className="flex-1 text-left hover:bg-gray-100 rounded px-2 py-1"
+              >
+                <span className="font-medium text-gray-900">{transaction.description}</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setNewNote(transaction.note || '');
+                setShowNoteModal(true);
+              }}
+              className={`text-gray-400 hover:text-gray-600 ${transaction.note ? 'text-indigo-500' : ''}`}
+              title={transaction.note || 'Add note'}
+            >
+              <StickyNote className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="w-[200px] flex-shrink-0">
           <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+            onClick={() => setShowBudgetModal(true)}
+            className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
           >
-            <Calendar className="w-4 h-4 text-gray-400" />
+            {transaction.category?.name ? (
+              <span className="text-indigo-600">{transaction.category.name}</span>
+            ) : (
+              <span className="text-gray-400">No category</span>
+            )}
           </button>
-          {isEditing ? (
+        </div>
+
+        <div className="flex items-center gap-4 w-[200px] flex-shrink-0 justify-end">
+          {isEditingAmount ? (
             <input
-              type="date"
-              value={newAssignedDate}
-              onChange={handleDateChange}
-              onBlur={() => setIsEditing(false)}
-              className="border rounded px-2 py-1 text-sm"
+              type="number"
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value)}
+              onBlur={handleAmountChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAmountChange();
+                }
+              }}
+              className="w-24 border rounded px-2 py-1 text-sm text-right"
               autoFocus
             />
           ) : (
-            <span
-              className={`text-gray-700 ${datesAreDifferent ? 'italic' : ''}`}
+            <button
+              onClick={() => setIsEditingAmount(true)}
+              className="hover:bg-gray-100 rounded px-2 py-1"
             >
-              {format(parseISO(transaction.assigned_date), 'PPP')}
-            </span>
+              <Amount value={transaction.amount} />
+            </button>
+          )}
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="text-gray-600 hover:text-gray-800"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(transaction.id)}
+              className="text-red-600 hover:text-red-800"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
         </div>
-      </div>
-
-      <div className="flex-1 min-w-0 px-4">
-        {isEditingDescription ? (
-          <input
-            type="text"
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-            onBlur={handleDescriptionChange}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleDescriptionChange();
-              }
-            }}
-            className="w-full border rounded px-2 py-1 text-sm"
-            autoFocus
-          />
-        ) : (
-          <button
-            onClick={() => setIsEditingDescription(true)}
-            className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
-          >
-            <span className="font-medium text-gray-900">{transaction.description}</span>
-          </button>
-        )}
-      </div>
-
-      <div className="w-[200px] flex-shrink-0">
-        <button
-          onClick={() => setShowBudgetModal(true)}
-          className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
-        >
-          {transaction.category?.name ? (
-            <span className="text-indigo-600">{transaction.category.name}</span>
-          ) : (
-            <span className="text-gray-400">No category</span>
-          )}
-        </button>
-      </div>
-
-      <div className="flex items-center gap-4 w-[200px] flex-shrink-0 justify-end">
-        {isEditingAmount ? (
-          <input
-            type="number"
-            value={newAmount}
-            onChange={(e) => setNewAmount(e.target.value)}
-            onBlur={handleAmountChange}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleAmountChange();
-              }
-            }}
-            className="w-24 border rounded px-2 py-1 text-sm text-right"
-            autoFocus
-          />
-        ) : (
-          <button
-            onClick={() => setIsEditingAmount(true)}
-            className="hover:bg-gray-100 rounded px-2 py-1"
-          >
-            <Amount value={transaction.amount} />
-          </button>
-        )}
-        <button
-          onClick={() => setIsEditModalOpen(true)}
-          className="text-gray-600 hover:text-gray-800"
-        >
-          <Edit2 className="w-4 h-4" />
-        </button>
-        {onDelete && (
-          <button
-            onClick={() => onDelete(transaction.id)}
-            className="text-red-600 hover:text-red-800"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       <Modal
@@ -405,6 +439,35 @@ export function TransactionItem({
           isEditing={true}
           onClose={() => setIsEditModalOpen(false)}
         />
+      </Modal>
+
+      <Modal
+        isOpen={showNoteModal}
+        onClose={() => setShowNoteModal(false)}
+        title="Transaction Note"
+      >
+        <div className="space-y-4">
+          <textarea
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            className="w-full h-32 text-sm border rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Add a note..."
+          />
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setShowNoteModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleNoteChange}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Save Note
+            </button>
+          </div>
+        </div>
       </Modal>
 
       <BudgetCategoryModal

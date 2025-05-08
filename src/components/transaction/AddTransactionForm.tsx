@@ -15,6 +15,7 @@ interface FormData {
   description: string;
   date: string;
   transactionType: 'spending' | 'deposit';
+  note?: string;
 }
 
 interface AddTransactionFormProps {
@@ -335,6 +336,23 @@ export function AddTransactionForm({
                 value={formData.date}
                 onChange={(e) => onChange({ date: e.target.value })}
                 required
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="note"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Note
+              </label>
+              <textarea
+                id="note"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                value={formData.note}
+                onChange={(e) => onChange({ note: e.target.value })}
+                rows={3}
+                placeholder="Add a note..."
               />
             </div>
           </div>
