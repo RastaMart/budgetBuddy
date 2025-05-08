@@ -6,23 +6,153 @@ import { Account } from '../types/account';
 import { Modal } from '../components/shared/Modal';
 import { accountIcons, AccountIconType } from '../utils/accountIcons';
 
+// Move the AccountForm component outside of the Accounts component
+type FormData = {
+  name: string;
+  identifier: string;
+  type: 'bank' | 'credit';
+  icon: AccountIconType;
+};
+
+interface AccountFormProps {
+  onSubmit: (e: React.FormEvent) => void;
+  formData: FormData;
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
+  isEdit?: boolean;
+  onCancel: () => void;
+}
+
+const AccountForm = ({
+  onSubmit,
+  formData,
+  setFormData,
+  isEdit = false,
+  onCancel,
+}: AccountFormProps) => {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div>
+        <label
+          htmlFor="name"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Account Name
+        </label>
+        <input
+          type="text"
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          placeholder="e.g., My Personal Account"
+          required
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor="identifier"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Account Identifier
+        </label>
+        <input
+          type="text"
+          id="identifier"
+          value={formData.identifier}
+          onChange={(e) =>
+            setFormData({ ...formData, identifier: e.target.value })
+          }
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          placeholder="Account/Card number"
+          required
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor="type"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Account Type
+        </label>
+        <select
+          id="type"
+          value={formData.type}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              type: e.target.value as 'bank' | 'credit',
+            })
+          }
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          required
+        >
+          <option value="bank">Bank Account</option>
+          <option value="credit">Credit Card</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Account Icon
+        </label>
+        <div className="grid grid-cols-6 gap-2 max-h-64 overflow-y-auto">
+          {Object.entries(accountIcons).map(([name, Icon]) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() =>
+                setFormData({ ...formData, icon: name as AccountIconType })
+              }
+              className={`p-3 rounded-lg flex items-center justify-center ${
+                formData.icon === name
+                  ? 'bg-indigo-100 text-indigo-600 ring-2 ring-indigo-500'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Icon className="w-6 h-6" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-end space-x-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          {isEdit ? 'Update Account' : 'Add Account'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
 export function Accounts() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [addFormData, setAddFormData] = useState({
+  const [addFormData, setAddFormData] = useState<FormData>({
     name: '',
     identifier: '',
-    type: 'bank' as 'bank' | 'credit',
-    icon: 'wallet' as AccountIconType,
+    type: 'bank',
+    icon: 'wallet',
   });
-  const [editFormData, setEditFormData] = useState({
+  const [editFormData, setEditFormData] = useState<FormData>({
     name: '',
     identifier: '',
-    type: 'bank' as 'bank' | 'credit',
-    icon: 'wallet' as AccountIconType,
+    type: 'bank',
+    icon: 'wallet',
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -100,10 +230,7 @@ export function Accounts() {
 
   async function handleDelete(id: string) {
     try {
-      const { error } = await supabase
-        .from('accounts')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('accounts').delete().eq('id', id);
 
       if (error) throw error;
       fetchAccounts();
@@ -122,117 +249,6 @@ export function Accounts() {
     });
     setShowEditModal(true);
   }
-
-  const AccountForm = ({ onSubmit, isEdit = false }: { onSubmit: (e: React.FormEvent) => void, isEdit?: boolean }) => {
-    const formData = isEdit ? editFormData : addFormData;
-    const setFormData = isEdit ? setEditFormData : setAddFormData;
-
-    return (
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Account Name
-          </label>
-          <input
-            type="text"
-            id="name"
-            value={formData.name}
-            onChange={(e) =>
-              setFormData({ ...formData, name: e.target.value })
-            }
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            placeholder="e.g., My Personal Account"
-            required
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="identifier"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Account Identifier
-          </label>
-          <input
-            type="text"
-            id="identifier"
-            value={formData.identifier}
-            onChange={(e) =>
-              setFormData({ ...formData, identifier: e.target.value })
-            }
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            placeholder="Account/Card number"
-            required
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="type"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Account Type
-          </label>
-          <select
-            id="type"
-            value={formData.type}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                type: e.target.value as 'bank' | 'credit',
-              })
-            }
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            required
-          >
-            <option value="bank">Bank Account</option>
-            <option value="credit">Credit Card</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Account Icon
-          </label>
-          <div className="grid grid-cols-6 gap-2 max-h-64 overflow-y-auto">
-            {Object.entries(accountIcons).map(([name, Icon]) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setFormData({ ...formData, icon: name as AccountIconType })}
-                className={`p-3 rounded-lg flex items-center justify-center ${
-                  formData.icon === name
-                    ? 'bg-indigo-100 text-indigo-600 ring-2 ring-indigo-500'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Icon className="w-6 h-6" />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => isEdit ? setShowEditModal(false) : setShowAddModal(false)}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            {isEdit ? 'Update Account' : 'Add Account'}
-          </button>
-        </div>
-      </form>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -313,7 +329,12 @@ export function Accounts() {
         onClose={() => setShowAddModal(false)}
         title="Add Account"
       >
-        <AccountForm onSubmit={handleSubmit} />
+        <AccountForm
+          onSubmit={handleSubmit}
+          formData={addFormData}
+          setFormData={setAddFormData}
+          onCancel={() => setShowAddModal(false)}
+        />
       </Modal>
 
       <Modal
@@ -321,7 +342,13 @@ export function Accounts() {
         onClose={() => setShowEditModal(false)}
         title="Edit Account"
       >
-        <AccountForm onSubmit={handleEdit} isEdit />
+        <AccountForm
+          onSubmit={handleEdit}
+          formData={editFormData}
+          setFormData={setEditFormData}
+          isEdit={true}
+          onCancel={() => setShowEditModal(false)}
+        />
       </Modal>
     </div>
   );
