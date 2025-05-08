@@ -1,40 +1,24 @@
-import React, { useState, useRef } from 'react';
-import { Upload } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../hooks/useContext';
+import React, { useState } from 'react';
+import { CSVDropzone } from './CSVDropzone';
+import { CSVColumnMapping } from './CSVColumnMapping';
+import { readCSVFile } from '../../utils/csvParser';
+import { CSVPreview, CSVTransaction, ImportError } from '../../types/csv';
+import { Account } from '../../types/account';
+import { Transaction } from '../../types/transaction';
+import { Amount } from '../shared/Amount';
+import { format, parseISO } from 'date-fns';
 import {
   parseDate,
   cleanAmount,
   cleanDescription,
 } from '../../utils/dateParser';
-import { format, parseISO } from 'date-fns';
-import { Amount } from '../shared/Amount';
-import { Transaction } from '../../types/transaction';
-import { Account } from '../../types/account';
-
-interface CSVTransaction {
-  date: string;
-  description: string;
-  amount: string;
-  isDuplicate?: boolean;
-  selected?: boolean;
-}
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useContext';
 
 interface CSVImportProps {
   onTransactionsLoaded: (transactions: Transaction[]) => void;
   accounts: Account[];
   onClose?: () => void;
-}
-
-interface CSVPreview {
-  headers: string[];
-  rows: string[][];
-}
-
-interface ImportError {
-  row: number;
-  error: string;
-  data: CSVTransaction;
 }
 
 export function CSVImport({
@@ -43,7 +27,6 @@ export function CSVImport({
   onClose,
 }: CSVImportProps) {
   const { user } = useAuth();
-  const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [csvPreview, setCsvPreview] = useState<CSVPreview | null>(null);
   const [mappingStep, setMappingStep] = useState<
@@ -77,53 +60,14 @@ export function CSVImport({
     CSVTransaction[]
   >([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const processCSV = async (file: File) => {
+  const handleFileSelect = async (file: File) => {
     try {
-      const text = await file.text();
-      const lines = text.split('\n');
-      const headers = lines[0].split(',').map((h) => h.trim());
-      const rows = lines
-        .slice(1)
-        .filter((line) => line.trim())
-        .map((line) => line.split(',').map((cell) => cell.trim()));
-
+      const { headers, rows } = await readCSVFile(file);
       setCsvPreview({ headers, rows });
       setMappingStep('date');
     } catch (error) {
-      console.error('Error processing CSV file:', error);
-      setError(
-        'Error processing CSV file. Please check the format and try again.'
-      );
-    }
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    if (file && file.type === 'text/csv') {
-      await processCSV(file);
-    } else {
-      setError('Please upload a CSV file');
-    }
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      await processCSV(file);
+      setError('Error processing CSV file. Please check the format and try again.');
     }
   };
 
@@ -175,9 +119,10 @@ export function CSVImport({
     setIsSingleAmountColumn(singleColumn);
     setMappingStep(singleColumn ? 'amount' : 'amount-split');
   };
-  if (user === null) throw new Error('User is not authenticated');
 
   const checkForDuplicates = async (transactions: CSVTransaction[]) => {
+    if (!user) throw new Error('User not found');
+
     const duplicateChecks = await Promise.all(
       transactions.map(async (transaction) => {
         const { data } = await supabase
@@ -284,6 +229,8 @@ export function CSVImport({
       return;
     }
 
+    if (!user) throw new Error('User not found');
+
     setMappingStep('importing');
     const stats = {
       total: transactions.length,
@@ -294,6 +241,7 @@ export function CSVImport({
 
     const selectedCSVTransactions = transactions.filter((t) => t.selected);
     const newTransactions: Transaction[] = [];
+
     for (const transaction of selectedCSVTransactions) {
       try {
         const { data, error } = await supabase
@@ -309,7 +257,6 @@ export function CSVImport({
           })
           .select();
 
-        console.log('error', error, transaction);
         if (error) throw error;
 
         if (data && data.length > 0) {
@@ -328,223 +275,32 @@ export function CSVImport({
 
     setImportStats(stats);
     setMappingStep('complete');
-
     onTransactionsLoaded(newTransactions);
-    console.log('importTransactions done');
   };
-
-  const renderColumnSelection = (title: string, description: string) => (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b">
-          <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-          <p className="mt-1 text-sm text-gray-500">{description}</p>
-        </div>
-        <div className="overflow-x-auto max-h-[60vh]">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="sticky top-0 bg-white">
-              <tr>
-                {csvPreview?.headers.map((header, i) => (
-                  <th
-                    key={i}
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-50 ${
-                      columnMapping.date === i ||
-                      columnMapping.description === i ||
-                      columnMapping.amount === i ||
-                      columnMapping.spending === i ||
-                      columnMapping.deposit === i
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'text-gray-500'
-                    }`}
-                    onClick={() => handleColumnSelect(i)}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {csvPreview?.rows.map((row, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  {row.map((cell, j) => (
-                    <td
-                      key={j}
-                      className={`px-4 py-2 text-sm whitespace-nowrap ${
-                        columnMapping.date === j ||
-                        columnMapping.description === j ||
-                        columnMapping.amount === j ||
-                        columnMapping.spending === j ||
-                        columnMapping.deposit === j
-                          ? 'text-indigo-900 bg-indigo-50'
-                          : 'text-gray-500'
-                      }`}
-                      onClick={() => handleColumnSelect(j)}
-                    >
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderReviewStep = () => (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b">
-          <h3 className="text-lg font-medium text-gray-900">
-            Review Transactions
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Select which transactions to import. Duplicates are unselected by
-            default.
-          </p>
-        </div>
-
-        <div className="p-4 border-b">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Account
-          </label>
-          <select
-            value={selectedAccount}
-            onChange={(e) => setSelectedAccount(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            required
-          >
-            <option value="">Select an account</option>
-            <optgroup label="Bank Accounts">
-              {accounts
-                .filter((a) => a.type === 'bank')
-                .map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-            </optgroup>
-            <optgroup label="Credit Cards">
-              {accounts
-                .filter((a) => a.type === 'credit')
-                .map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-            </optgroup>
-          </select>
-        </div>
-
-        <div className="overflow-x-auto max-h-[60vh]">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="sticky top-0 bg-white">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  <input
-                    type="checkbox"
-                    checked={parsedTransactions.every((t) => t.selected)}
-                    onChange={(e) => toggleAllTransactions(e.target.checked)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Description
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Amount
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {parsedTransactions.map((transaction, index) => (
-                <tr
-                  key={index}
-                  className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                >
-                  <td className="px-4 py-2">
-                    <input
-                      type="checkbox"
-                      checked={transaction.selected}
-                      onChange={() => toggleTransactionSelection(index)}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </td>
-                  <td className="px-4 py-2">
-                    {transaction.isDuplicate ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        Duplicate
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        New
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
-                    {format(parseISO(transaction.date), 'PPP')}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-900">
-                    {transaction.description}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-right whitespace-nowrap">
-                    <Amount value={parseFloat(transaction.amount)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="p-4 border-t bg-gray-50">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              {parsedTransactions.filter((t) => t.selected).length} of{' '}
-              {parsedTransactions.length} transactions selected
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => importTransactions(parsedTransactions)}
-                disabled={
-                  !parsedTransactions.some((t) => t.selected) ||
-                  !selectedAccount
-                }
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Import Selected
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   const renderMappingStep = () => {
     if (!csvPreview) return null;
 
     switch (mappingStep) {
       case 'date':
-        return renderColumnSelection(
-          'Select Date Column',
-          'Click on the column header or any cell in the column that contains transaction dates'
+        return (
+          <CSVColumnMapping
+            csvPreview={csvPreview}
+            columnMapping={columnMapping}
+            onColumnSelect={handleColumnSelect}
+            title="Select Date Column"
+            description="Click on the column header or any cell in the column that contains transaction dates"
+          />
         );
       case 'description':
-        return renderColumnSelection(
-          'Select Description Column',
-          'Click on the column header or any cell in the column that contains transaction descriptions'
+        return (
+          <CSVColumnMapping
+            csvPreview={csvPreview}
+            columnMapping={columnMapping}
+            onColumnSelect={handleColumnSelect}
+            title="Select Description Column"
+            description="Click on the column header or any cell in the column that contains transaction descriptions"
+          />
         );
       case 'amount-type':
         return (
@@ -579,21 +335,173 @@ export function CSVImport({
           </div>
         );
       case 'amount':
-        return renderColumnSelection(
-          'Select Amount Column',
-          'Click on the column header or any cell in the column that contains transaction amounts'
+        return (
+          <CSVColumnMapping
+            csvPreview={csvPreview}
+            columnMapping={columnMapping}
+            onColumnSelect={handleColumnSelect}
+            title="Select Amount Column"
+            description="Click on the column header or any cell in the column that contains transaction amounts"
+          />
         );
       case 'amount-split':
-        return renderColumnSelection(
-          columnMapping.spending
-            ? 'Select Deposit Column'
-            : 'Select Spending Column',
-          columnMapping.spending
-            ? 'Click on the column header or any cell in the column that contains deposit amounts'
-            : 'Click on the column header or any cell in the column that contains spending amounts'
+        return (
+          <CSVColumnMapping
+            csvPreview={csvPreview}
+            columnMapping={columnMapping}
+            onColumnSelect={handleColumnSelect}
+            title={
+              columnMapping.spending
+                ? 'Select Deposit Column'
+                : 'Select Spending Column'
+            }
+            description={
+              columnMapping.spending
+                ? 'Click on the column header or any cell in the column that contains deposit amounts'
+                : 'Click on the column header or any cell in the column that contains spending amounts'
+            }
+          />
         );
       case 'review':
-        return renderReviewStep();
+        return (
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Review Transactions
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Select which transactions to import. Duplicates are unselected by
+                  default.
+                </p>
+              </div>
+
+              <div className="p-4 border-b">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Account
+                </label>
+                <select
+                  value={selectedAccount}
+                  onChange={(e) => setSelectedAccount(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  required
+                >
+                  <option value="">Select an account</option>
+                  <optgroup label="Bank Accounts">
+                    {accounts
+                      .filter((a) => a.type === 'bank')
+                      .map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Credit Cards">
+                    {accounts
+                      .filter((a) => a.type === 'credit')
+                      .map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="overflow-x-auto max-h-[60vh]">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="sticky top-0 bg-white">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={parsedTransactions.every((t) => t.selected)}
+                          onChange={(e) => toggleAllTransactions(e.target.checked)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Date
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Description
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Amount
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {parsedTransactions.map((transaction, index) => (
+                      <tr
+                        key={index}
+                        className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                      >
+                        <td className="px-4 py-2">
+                          <input
+                            type="checkbox"
+                            checked={transaction.selected}
+                            onChange={() => toggleTransactionSelection(index)}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          {transaction.isDuplicate ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              Duplicate
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              New
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">
+                          {format(parseISO(transaction.date), 'PPP')}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900">
+                          {transaction.description}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right whitespace-nowrap">
+                          <Amount value={parseFloat(transaction.amount)} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="p-4 border-t bg-gray-50">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-500">
+                    {parsedTransactions.filter((t) => t.selected).length} of{' '}
+                    {parsedTransactions.length} transactions selected
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={onClose}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => importTransactions(parsedTransactions)}
+                      disabled={
+                        !parsedTransactions.some((t) => t.selected) ||
+                        !selectedAccount
+                      }
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Import Selected
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
       case 'importing':
         return (
           <div className="bg-white p-6 rounded-lg shadow">
@@ -712,43 +620,8 @@ export function CSVImport({
   return (
     <div className="space-y-4">
       {mappingStep === 'initial' && (
-        <div
-          className={`relative border-2 border-dashed rounded-lg p-8 text-center ${
-            isDragging
-              ? 'border-indigo-500 bg-indigo-50'
-              : 'border-gray-300 bg-gray-50'
-          }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept=".csv"
-            onChange={handleFileSelect}
-          />
-          <Upload className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-sm text-gray-600">
-            Drag and drop your CSV file here, or{' '}
-            <button
-              type="button"
-              className="text-indigo-600 hover:text-indigo-500"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              browse
-            </button>
-          </p>
-        </div>
+        <CSVDropzone onFileSelect={handleFileSelect} error={error} />
       )}
-
-      {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <p className="text-sm text-red-700">{error}</p>
-        </div>
-      )}
-
       {renderMappingStep()}
     </div>
   );
