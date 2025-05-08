@@ -38,7 +38,7 @@ export function TransactionItem({
   const [newAssignedDate, setNewAssignedDate] = useState(transaction.assigned_date);
   const [newDescription, setNewDescription] = useState(transaction.description);
   const [newAmount, setNewAmount] = useState(Math.abs(transaction.amount).toString());
-  const [newNote, setNewNote] = useState(transaction.note || '');
+  const [newNote, setNewNote] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [editFormData, setEditFormData] = useState({
     description: transaction.description,
@@ -55,6 +55,11 @@ export function TransactionItem({
   React.useEffect(() => {
     fetchAccounts();
   }, []);
+
+  // Update note state when transaction changes
+  React.useEffect(() => {
+    setNewNote(transaction.note || '');
+  }, [transaction.note]);
 
   async function fetchAccounts() {
     try {
@@ -363,7 +368,6 @@ export function TransactionItem({
             )}
             <button
               onClick={() => {
-                setNewNote(transaction.note || '');
                 setShowNoteModal(true);
               }}
               className={`text-gray-400 hover:text-gray-600 ${transaction.note ? 'text-indigo-500' : ''}`}

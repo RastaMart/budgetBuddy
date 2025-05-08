@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useContext';
-import { Plus } from 'lucide-react';
 import { Modal } from '../components/shared/Modal';
 import { AddTransactionForm } from '../components/transaction/AddTransactionForm';
 import { Card } from '../components/shared/Card';
@@ -56,6 +56,7 @@ export function Transactions() {
     description: '',
     date: new Date().toISOString().split('T')[0],
     transactionType: 'spending' as 'spending' | 'deposit',
+    note: '',
   });
 
   useEffect(() => {
@@ -250,6 +251,7 @@ export function Transactions() {
           assigned_date,
           account_id,
           type,
+          note,
           category:categories(name, budget:budgets(name)),
           account:accounts(name, icon)
         `
@@ -324,6 +326,7 @@ export function Transactions() {
         date: formData.date,
         assigned_date: formData.date,
         type: 'account',
+        note: formData.note || null,
       });
 
       if (error) throw error;
@@ -335,6 +338,7 @@ export function Transactions() {
         description: '',
         date: new Date().toISOString().split('T')[0],
         transactionType: 'spending',
+        note: '',
       });
 
       setShowTransactionModal(false);
