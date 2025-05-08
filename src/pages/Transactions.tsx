@@ -7,7 +7,6 @@ import { AddTransactionForm } from '../components/transaction/AddTransactionForm
 import { Card } from '../components/shared/Card';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { useSearchParams } from 'react-router-dom';
-import { TransactionFilters } from '../components/transaction/TransactionFilters';
 import { TransactionList } from '../components/transaction/TransactionList';
 import {
   format,
@@ -19,42 +18,6 @@ import {
   subDays,
   endOfDay,
 } from 'date-fns';
-
-interface Transaction {
-  id: string;
-  category_id: string | null;
-  amount: number;
-  description: string;
-  date: string;
-  assigned_date: string;
-  type: 'account' | 'virtual' | 'income_distribution';
-  account_id: string | null;
-  category?: {
-    name: string;
-    budget?: {
-      name: string;
-    };
-  } | null;
-  account?: {
-    name: string;
-    icon: string;
-  } | null;
-}
-
-interface GroupedTransactions {
-  [year: string]: {
-    [month: string]: Transaction[];
-  };
-}
-
-interface Budget {
-  id: string;
-  name: string;
-  categories: {
-    id: string;
-    name: string;
-  }[];
-}
 
 export function Transactions() {
   const { user } = useAuth();
@@ -427,33 +390,29 @@ export function Transactions() {
       </div>
 
       <Card>
-        <TransactionFilters
-          accountFilter={accountFilter}
-          setAccountFilter={setAccountFilter}
-          descriptionFilter={descriptionFilter}
-          setDescriptionFilter={setDescriptionFilter}
-          categoryFilter={categoryFilter}
-          setCategoryFilter={setCategoryFilter}
-          periodFilter={periodFilter}
-          setPeriodFilter={setPeriodFilter}
-          yearFilter={yearFilter}
-          setYearFilter={setYearFilter}
-          monthFilter={monthFilter}
-          setMonthFilter={setMonthFilter}
-          accounts={accounts}
-          budgets={budgets}
-          allTransactions={allTransactions}
-          clearFilters={clearFilters}
-          showClearFilters={showClearFilters}
-        />
-      </Card>
-
-      <Card>
         <TransactionList
           transactions={transactions}
+          accounts={accounts}
           onDelete={handleDelete}
           onTransactionUpdate={fetchTransactions}
           onAddTransaction={() => setShowTransactionModal(true)}
+          filters={{
+            accountFilter,
+            setAccountFilter,
+            descriptionFilter,
+            setDescriptionFilter,
+            categoryFilter,
+            setCategoryFilter,
+            periodFilter,
+            setPeriodFilter,
+            yearFilter,
+            setYearFilter,
+            monthFilter,
+            setMonthFilter,
+            budgets,
+            clearFilters,
+            showClearFilters
+          }}
         />
       </Card>
 
