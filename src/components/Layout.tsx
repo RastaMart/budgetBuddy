@@ -1,12 +1,20 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, PieChart, Receipt, Settings, LogOut, Wallet } from 'lucide-react';
+import {
+  Home,
+  PieChart,
+  Receipt,
+  Settings,
+  LogOut,
+  Wallet,
+} from 'lucide-react';
 import { useAuth } from '../hooks/useContext';
 import { Avatar } from './ui/Avatar';
 import { VERSION } from '../version.js';
 
 export function Layout() {
   const { signOut, profile } = useAuth();
+  const environment = import.meta.env.VITE_APP_ENV;
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -106,7 +114,9 @@ export function Layout() {
                   <p className="text-sm font-medium text-gray-900">
                     {profile?.name || profile?.email}
                   </p>
-                  <p className="text-xs text-gray-500">v{VERSION}</p>
+                  <p className="text-xs text-gray-500">
+                    v{VERSION} ({environment})
+                  </p>
                 </div>
               </div>
             </div>
