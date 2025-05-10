@@ -36,11 +36,6 @@ export function TransactionItem({
     return null;
   }
 
-  // Early return if transaction is undefined
-  if (!transaction) {
-    return null;
-  }
-
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -49,38 +44,26 @@ export function TransactionItem({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
-  const [newAssignedDate, setNewAssignedDate] = useState(
-    transaction.assigned_date || transaction.date
-  );
-  const [newDescription, setNewDescription] = useState(
-    transaction.description || ''
-  );
-  const [newAmount, setNewAmount] = useState(
-    Math.abs(transaction.amount || 0).toString()
-  );
+  const [newAssignedDate, setNewAssignedDate] = useState(transaction.assigned_date || transaction.date);
+  const [newDescription, setNewDescription] = useState(transaction.description || '');
+  const [newAmount, setNewAmount] = useState(Math.abs(transaction.amount || 0).toString());
   const [newNote, setNewNote] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [editFormData, setEditFormData] = useState({
     description: transaction.description || '',
     amount: Math.abs(transaction.amount || 0).toString(),
+    description: transaction.description || '',
+    amount: Math.abs(transaction.amount || 0).toString(),
     date: transaction.date,
     account_id: transaction.account_id || '',
     transactionType:
-      (transaction.amount || 0) < 0
-        ? 'spending'
-        : ('deposit' as 'spending' | 'deposit'),
+      (transaction.amount || 0) < 0 ? 'spending' : ('deposit' as 'spending' | 'deposit'),
   });
 
-  const Icon = transaction.account?.icon
-    ? getAccountIcon(transaction.account.icon)
-    : null;
-  const datesAreDifferent =
-    transaction.date && transaction.assigned_date
-      ? !isEqual(
-          parseISO(transaction.date),
-          parseISO(transaction.assigned_date)
-        )
-      : false;
+  const Icon = transaction.account?.icon ? getAccountIcon(transaction.account.icon) : null;
+  const datesAreDifferent = transaction.date && transaction.assigned_date 
+    ? !isEqual(parseISO(transaction.date), parseISO(transaction.assigned_date))
+    : false;
 
   React.useEffect(() => {
     fetchAccounts();
@@ -123,7 +106,6 @@ export function TransactionItem({
     } catch (error) {
       console.error('Error updating assigned date:', error);
       setNewAssignedDate(transaction.assigned_date || transaction.date);
-      setNewAssignedDate(transaction.assigned_date || transaction.date);
     } finally {
       setIsEditing(false);
     }
@@ -149,12 +131,14 @@ export function TransactionItem({
     } catch (error) {
       console.error('Error updating description:', error);
       setNewDescription(transaction.description || '');
+      setNewDescription(transaction.description || '');
     } finally {
       setIsEditingDescription(false);
     }
   };
 
   const handleAmountChange = async () => {
+    if (parseFloat(newAmount) === Math.abs(transaction.amount || 0)) {
     if (parseFloat(newAmount) === Math.abs(transaction.amount || 0)) {
       setIsEditingAmount(false);
       return;
@@ -165,6 +149,7 @@ export function TransactionItem({
         .from('transactions')
         .update({
           amount:
+            (transaction.amount || 0) < 0
             (transaction.amount || 0) < 0
               ? -Math.abs(parseFloat(newAmount))
               : Math.abs(parseFloat(newAmount)),
@@ -178,6 +163,7 @@ export function TransactionItem({
       }
     } catch (error) {
       console.error('Error updating amount:', error);
+      setNewAmount(Math.abs(transaction.amount || 0).toString());
       setNewAmount(Math.abs(transaction.amount || 0).toString());
     } finally {
       setIsEditingAmount(false);
@@ -375,10 +361,7 @@ export function TransactionItem({
               <span
                 className={`text-gray-700 ${datesAreDifferent ? 'italic' : ''}`}
               >
-                {format(
-                  parseISO(transaction.assigned_date || transaction.date),
-                  'PPP'
-                )}
+                {format(parseISO(transaction.assigned_date || transaction.date), 'PPP')}
               </span>
             )}
           </div>
@@ -460,6 +443,7 @@ export function TransactionItem({
               className="hover:bg-gray-100 rounded px-2 py-1"
             >
               <Amount value={transaction.amount || 0} />
+              <Amount value={transaction.amount || 0} />
             </button>
           )}
           <button
@@ -522,16 +506,14 @@ export function TransactionItem({
         </div>
       </Modal>
 
-      {showCategory && (
-        <BudgetCategoryModal
-          isOpen={showBudgetModal}
-          onClose={() => setShowBudgetModal(false)}
-          description={transaction.description || ''}
-          onSelect={handleCategoryUpdate}
-          currentCategoryId={transaction.category_id}
-          account_id={transaction.account_id}
-        />
-      )}
+      <BudgetCategoryModal
+        isOpen={showBudgetModal}
+        onClose={() => setShowBudgetModal(false)}
+        description={transaction.description || ''}
+        onSelect={handleCategoryUpdate}
+        currentCategoryId={transaction.category_id}
+        account_id={transaction.account_id}
+      />
     </div>
   );
 }
