@@ -268,6 +268,7 @@ export function CategoryItem({
                 <TransactionItem
                   key={transaction.id}
                   transaction={transaction}
+                  showCategory={false}
                   isSelected={false}
                   selectEnable={false}
                   onSelect={() => {}}
