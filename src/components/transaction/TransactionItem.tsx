@@ -36,6 +36,11 @@ export function TransactionItem({
     return null;
   }
 
+  // Early return if transaction is undefined
+  if (!transaction) {
+    return null;
+  }
+
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -117,6 +122,7 @@ export function TransactionItem({
       }
     } catch (error) {
       console.error('Error updating assigned date:', error);
+      setNewAssignedDate(transaction.assigned_date || transaction.date);
       setNewAssignedDate(transaction.assigned_date || transaction.date);
     } finally {
       setIsEditing(false);
