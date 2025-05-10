@@ -181,11 +181,6 @@ export function CategoryItem({
     }
   }
 
-  const handleCategoryUpdate = () => {
-    fetchTransactions();
-    onTransactionAdded();
-  };
-
   return (
     <div className="px-6 py-4">
       <div className="space-y-4">
@@ -280,7 +275,6 @@ export function CategoryItem({
                   selectEnable={false}
                   onSelect={() => {}}
                   onDelete={() => handleDeleteTransaction(transaction)}
-                  onCategoryUpdate={handleCategoryUpdate}
                 />
               ))
             )}
