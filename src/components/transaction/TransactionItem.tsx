@@ -44,9 +44,15 @@ export function TransactionItem({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
-  const [newAssignedDate, setNewAssignedDate] = useState(transaction.assigned_date || transaction.date);
-  const [newDescription, setNewDescription] = useState(transaction.description || '');
-  const [newAmount, setNewAmount] = useState(Math.abs(transaction.amount || 0).toString());
+  const [newAssignedDate, setNewAssignedDate] = useState(
+    transaction.assigned_date || transaction.date
+  );
+  const [newDescription, setNewDescription] = useState(
+    transaction.description || ''
+  );
+  const [newAmount, setNewAmount] = useState(
+    Math.abs(transaction.amount || 0).toString()
+  );
   const [newNote, setNewNote] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [editFormData, setEditFormData] = useState({
@@ -57,13 +63,21 @@ export function TransactionItem({
     date: transaction.date,
     account_id: transaction.account_id || '',
     transactionType:
-      (transaction.amount || 0) < 0 ? 'spending' : ('deposit' as 'spending' | 'deposit'),
+      (transaction.amount || 0) < 0
+        ? 'spending'
+        : ('deposit' as 'spending' | 'deposit'),
   });
 
-  const Icon = transaction.account?.icon ? getAccountIcon(transaction.account.icon) : null;
-  const datesAreDifferent = transaction.date && transaction.assigned_date 
-    ? !isEqual(parseISO(transaction.date), parseISO(transaction.assigned_date))
-    : false;
+  const Icon = transaction.account?.icon
+    ? getAccountIcon(transaction.account.icon)
+    : null;
+  const datesAreDifferent =
+    transaction.date && transaction.assigned_date
+      ? !isEqual(
+          parseISO(transaction.date),
+          parseISO(transaction.assigned_date)
+        )
+      : false;
 
   React.useEffect(() => {
     fetchAccounts();
@@ -361,7 +375,10 @@ export function TransactionItem({
               <span
                 className={`text-gray-700 ${datesAreDifferent ? 'italic' : ''}`}
               >
-                {format(parseISO(transaction.assigned_date || transaction.date), 'PPP')}
+                {format(
+                  parseISO(transaction.assigned_date || transaction.date),
+                  'PPP'
+                )}
               </span>
             )}
           </div>
