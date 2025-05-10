@@ -269,6 +269,7 @@ export function CategoryItem({
                   key={transaction.id}
                   transaction={transaction}
                   isSelected={false}
+                  selectEnable={false}
                   onSelect={() => {}}
                   onDelete={() => handleDeleteTransaction(transaction)}
                 />

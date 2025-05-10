@@ -18,6 +18,7 @@ interface TransactionItemProps {
   onAssignedDateChange?: () => void;
   onEdit?: () => void;
   showCategory?: boolean;
+  selectEnable?: boolean;
 }
 
 export function TransactionItem({
@@ -28,6 +29,7 @@ export function TransactionItem({
   onAssignedDateChange,
   onEdit,
   showCategory = true,
+  selectEnable = true,
 }: TransactionItemProps) {
   // Early return if transaction is undefined
   if (!transaction) {
@@ -42,9 +44,15 @@ export function TransactionItem({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
-  const [newAssignedDate, setNewAssignedDate] = useState(transaction.assigned_date || transaction.date);
-  const [newDescription, setNewDescription] = useState(transaction.description || '');
-  const [newAmount, setNewAmount] = useState(Math.abs(transaction.amount || 0).toString());
+  const [newAssignedDate, setNewAssignedDate] = useState(
+    transaction.assigned_date || transaction.date
+  );
+  const [newDescription, setNewDescription] = useState(
+    transaction.description || ''
+  );
+  const [newAmount, setNewAmount] = useState(
+    Math.abs(transaction.amount || 0).toString()
+  );
   const [newNote, setNewNote] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [editFormData, setEditFormData] = useState({
@@ -53,13 +61,21 @@ export function TransactionItem({
     date: transaction.date,
     account_id: transaction.account_id || '',
     transactionType:
-      (transaction.amount || 0) < 0 ? 'spending' : ('deposit' as 'spending' | 'deposit'),
+      (transaction.amount || 0) < 0
+        ? 'spending'
+        : ('deposit' as 'spending' | 'deposit'),
   });
 
-  const Icon = transaction.account?.icon ? getAccountIcon(transaction.account.icon) : null;
-  const datesAreDifferent = transaction.date && transaction.assigned_date 
-    ? !isEqual(parseISO(transaction.date), parseISO(transaction.assigned_date))
-    : false;
+  const Icon = transaction.account?.icon
+    ? getAccountIcon(transaction.account.icon)
+    : null;
+  const datesAreDifferent =
+    transaction.date && transaction.assigned_date
+      ? !isEqual(
+          parseISO(transaction.date),
+          parseISO(transaction.assigned_date)
+        )
+      : false;
 
   React.useEffect(() => {
     fetchAccounts();
@@ -227,23 +243,65 @@ export function TransactionItem({
     }
   };
 
+  const handleCategoryUpdate = async (
+    newCategoryId: string,
+    applyTo: 'single' | 'unassigned' | 'all'
+  ) => {
+    try {
+      const query = supabase.from('transactions');
+
+      switch (applyTo) {
+        case 'single':
+          await query
+            .update({ category_id: newCategoryId })
+            .eq('id', transaction.id);
+          break;
+
+        case 'unassigned':
+          await query
+            .update({ category_id: newCategoryId })
+            .eq('description', transaction.description)
+            .is('category_id', null)
+            .neq('type', 'income_distribution');
+          break;
+
+        case 'all':
+          await query
+            .update({ category_id: newCategoryId })
+            .eq('description', transaction.description)
+            .neq('type', 'income_distribution');
+          break;
+      }
+
+      if (onEdit) {
+        onEdit();
+      }
+    } catch (error) {
+      console.error('Error updating category:', error);
+    }
+  };
+
   return (
     <div className="space-y-2">
-      <div 
-        className="flex items-center py-2 text-sm relative group"
+      <div
+        className={`flex items-center py-2 text-sm relative group ${isHovered ? 'bg-gray-100' : ''}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="w-6 flex-shrink-0">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={onSelect}
-            className={`rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-opacity duration-200 ${
-              isHovered || isSelected ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
-        </div>
+        {selectEnable && (
+          <>
+            <div className="w-6 flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onSelect}
+                className={`rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-opacity duration-200 ${
+                  isHovered || isSelected ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            </div>
+          </>
+        )}
 
         <div className="flex items-center gap-4 w-[400px] flex-shrink-0">
           <div className="w-[200px] flex items-center gap-2">
@@ -283,7 +341,9 @@ export function TransactionItem({
                   <Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
                 )}
                 {transaction.account?.name && (
-                  <span className="text-gray-600 truncate">{transaction.account.name}</span>
+                  <span className="text-gray-600 truncate">
+                    {transaction.account.name}
+                  </span>
                 )}
               </button>
             )}
@@ -309,7 +369,10 @@ export function TransactionItem({
               <span
                 className={`text-gray-700 ${datesAreDifferent ? 'italic' : ''}`}
               >
-                {format(parseISO(transaction.assigned_date || transaction.date), 'PPP')}
+                {format(
+                  parseISO(transaction.assigned_date || transaction.date),
+                  'PPP'
+                )}
               </span>
             )}
           </div>
@@ -336,7 +399,9 @@ export function TransactionItem({
                 onClick={() => setIsEditingDescription(true)}
                 className="flex-1 text-left hover:bg-gray-100 rounded px-2 py-1"
               >
-                <span className="font-medium text-gray-900">{transaction.description}</span>
+                <span className="font-medium text-gray-900">
+                  {transaction.description}
+                </span>
               </button>
             )}
             <button
@@ -358,7 +423,9 @@ export function TransactionItem({
               className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
             >
               {transaction.category?.name ? (
-                <span className="text-indigo-600">{transaction.category.name}</span>
+                <span className="text-indigo-600">
+                  {transaction.category.name}
+                </span>
               ) : (
                 <span className="text-gray-400">No category</span>
               )}
