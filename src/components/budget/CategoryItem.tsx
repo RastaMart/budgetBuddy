@@ -267,15 +267,9 @@ export function CategoryItem({
               transactions.map((transaction) => (
                 <TransactionItem
                   key={transaction.id}
-                  id={transaction.id}
-                  description={transaction.description}
-                  amount={transaction.amount}
-                  date={transaction.date}
-                  assignedDate={transaction.assigned_date}
-                  categoryName={transaction.category?.name}
-                  account_id={transaction.account_id}
-                  accountName={transaction.account?.name}
-                  accountIcon={transaction.account?.icon}
+                  transaction={transaction}
+                  isSelected={false}
+                  onSelect={() => {}}
                   onDelete={() => handleDeleteTransaction(transaction)}
                 />
               ))
