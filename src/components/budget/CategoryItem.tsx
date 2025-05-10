@@ -13,6 +13,7 @@ import { Modal } from '../shared/Modal';
 import { AddTransactionForm } from '../transaction/AddTransactionForm';
 import { TransactionItem } from '../transaction/TransactionItem';
 import { DeleteTransactionModal } from '../transaction/DeleteTransactionModal';
+import { DeleteCategoryModal } from './DeleteCategoryModal';
 import { useAuth } from '../../hooks/useContext';
 import { supabase } from '../../lib/supabase';
 import { Transaction } from '../../types/transaction';
@@ -32,6 +33,7 @@ export function CategoryItem({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -241,7 +243,7 @@ export function CategoryItem({
               <Plus className="w-4 h-4" />
             </button>
             <button
-              onClick={() => onDelete(category.id)}
+              onClick={() => setShowDeleteCategoryModal(true)}
               className="text-red-600 hover:text-red-800"
             >
               <Trash2 className="w-4 h-4" />
@@ -307,6 +309,18 @@ export function CategoryItem({
           amount={selectedTransaction.amount}
         />
       )}
+
+      <DeleteCategoryModal
+        isOpen={showDeleteCategoryModal}
+        onClose={() => setShowDeleteCategoryModal(false)}
+        onConfirm={() => {
+          onDelete(category.id);
+          setShowDeleteCategoryModal(false);
+        }}
+        name={category.name}
+        amount={category.amount}
+        totalSpent={category.total_spent || 0}
+      />
     </div>
   );
 }
