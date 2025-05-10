@@ -17,6 +17,7 @@ interface TransactionItemProps {
   onDelete?: (id: string) => void;
   onAssignedDateChange?: () => void;
   onEdit?: () => void;
+  showCategory?: boolean;
 }
 
 export function TransactionItem({
@@ -26,6 +27,7 @@ export function TransactionItem({
   onDelete,
   onAssignedDateChange,
   onEdit,
+  showCategory = true,
 }: TransactionItemProps) {
   // Early return if transaction is undefined
   if (!transaction) {
@@ -225,42 +227,6 @@ export function TransactionItem({
     }
   };
 
-  const handleCategoryUpdate = async (
-    newCategoryId: string,
-    applyTo: 'single' | 'unassigned' | 'all'
-  ) => {
-    try {
-      const query = supabase.from('transactions');
-
-      switch (applyTo) {
-        case 'single':
-          await query.update({ category_id: newCategoryId }).eq('id', transaction.id);
-          break;
-
-        case 'unassigned':
-          await query
-            .update({ category_id: newCategoryId })
-            .eq('description', transaction.description)
-            .is('category_id', null)
-            .neq('type', 'income_distribution');
-          break;
-
-        case 'all':
-          await query
-            .update({ category_id: newCategoryId })
-            .eq('description', transaction.description)
-            .neq('type', 'income_distribution');
-          break;
-      }
-
-      if (onEdit) {
-        onEdit();
-      }
-    } catch (error) {
-      console.error('Error updating category:', error);
-    }
-  };
-
   return (
     <div className="space-y-2">
       <div 
@@ -385,18 +351,20 @@ export function TransactionItem({
           </div>
         </div>
 
-        <div className="w-[200px] flex-shrink-0">
-          <button
-            onClick={() => setShowBudgetModal(true)}
-            className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
-          >
-            {transaction.category?.name ? (
-              <span className="text-indigo-600">{transaction.category.name}</span>
-            ) : (
-              <span className="text-gray-400">No category</span>
-            )}
-          </button>
-        </div>
+        {showCategory && (
+          <div className="w-[200px] flex-shrink-0">
+            <button
+              onClick={() => setShowBudgetModal(true)}
+              className="w-full text-left hover:bg-gray-100 rounded px-2 py-1"
+            >
+              {transaction.category?.name ? (
+                <span className="text-indigo-600">{transaction.category.name}</span>
+              ) : (
+                <span className="text-gray-400">No category</span>
+              )}
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-4 w-[200px] flex-shrink-0 justify-end">
           {isEditingAmount ? (
@@ -481,14 +449,16 @@ export function TransactionItem({
         </div>
       </Modal>
 
-      <BudgetCategoryModal
-        isOpen={showBudgetModal}
-        onClose={() => setShowBudgetModal(false)}
-        description={transaction.description || ''}
-        onSelect={handleCategoryUpdate}
-        currentCategoryId={transaction.category_id}
-        account_id={transaction.account_id}
-      />
+      {showCategory && (
+        <BudgetCategoryModal
+          isOpen={showBudgetModal}
+          onClose={() => setShowBudgetModal(false)}
+          description={transaction.description || ''}
+          onSelect={handleCategoryUpdate}
+          currentCategoryId={transaction.category_id}
+          account_id={transaction.account_id}
+        />
+      )}
     </div>
   );
 }
