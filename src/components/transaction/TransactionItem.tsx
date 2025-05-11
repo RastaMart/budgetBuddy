@@ -36,11 +36,6 @@ export function TransactionItem({
     return null;
   }
 
-  // Early return if transaction is undefined
-  if (!transaction) {
-    return null;
-  }
-
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -61,6 +56,8 @@ export function TransactionItem({
   const [newNote, setNewNote] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [editFormData, setEditFormData] = useState({
+    description: transaction.description || '',
+    amount: Math.abs(transaction.amount || 0).toString(),
     description: transaction.description || '',
     amount: Math.abs(transaction.amount || 0).toString(),
     date: transaction.date,
@@ -123,7 +120,6 @@ export function TransactionItem({
     } catch (error) {
       console.error('Error updating assigned date:', error);
       setNewAssignedDate(transaction.assigned_date || transaction.date);
-      setNewAssignedDate(transaction.assigned_date || transaction.date);
     } finally {
       setIsEditing(false);
     }
@@ -149,12 +145,14 @@ export function TransactionItem({
     } catch (error) {
       console.error('Error updating description:', error);
       setNewDescription(transaction.description || '');
+      setNewDescription(transaction.description || '');
     } finally {
       setIsEditingDescription(false);
     }
   };
 
   const handleAmountChange = async () => {
+    if (parseFloat(newAmount) === Math.abs(transaction.amount || 0)) {
     if (parseFloat(newAmount) === Math.abs(transaction.amount || 0)) {
       setIsEditingAmount(false);
       return;
@@ -165,6 +163,7 @@ export function TransactionItem({
         .from('transactions')
         .update({
           amount:
+            (transaction.amount || 0) < 0
             (transaction.amount || 0) < 0
               ? -Math.abs(parseFloat(newAmount))
               : Math.abs(parseFloat(newAmount)),
@@ -178,6 +177,7 @@ export function TransactionItem({
       }
     } catch (error) {
       console.error('Error updating amount:', error);
+      setNewAmount(Math.abs(transaction.amount || 0).toString());
       setNewAmount(Math.abs(transaction.amount || 0).toString());
     } finally {
       setIsEditingAmount(false);
@@ -460,6 +460,7 @@ export function TransactionItem({
               className="hover:bg-gray-100 rounded px-2 py-1"
             >
               <Amount value={transaction.amount || 0} />
+              <Amount value={transaction.amount || 0} />
             </button>
           )}
           <button
@@ -522,16 +523,14 @@ export function TransactionItem({
         </div>
       </Modal>
 
-      {showCategory && (
-        <BudgetCategoryModal
-          isOpen={showBudgetModal}
-          onClose={() => setShowBudgetModal(false)}
-          description={transaction.description || ''}
-          onSelect={handleCategoryUpdate}
-          currentCategoryId={transaction.category_id}
-          account_id={transaction.account_id}
-        />
-      )}
+      <BudgetCategoryModal
+        isOpen={showBudgetModal}
+        onClose={() => setShowBudgetModal(false)}
+        description={transaction.description || ''}
+        onSelect={handleCategoryUpdate}
+        currentCategoryId={transaction.category_id}
+        account_id={transaction.account_id}
+      />
     </div>
   );
 }
