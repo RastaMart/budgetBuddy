@@ -1,14 +1,26 @@
 import { supabase } from '../lib/supabase';
-import { createHash } from 'crypto-js/sha256';
 
-export async function processDocument(file: File, userId: string) {
+export async function processDocument(file: File) {
   try {
-    // Read file content
-    const fileContent = await file.text();
-    const fileName = file.name;
-    const fileType = file.type;
+    // Generate file hash
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-    // Call edge function to process document
+    // Convert file to base64
+    const fileData = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    // Get user ID from session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('No authenticated user');
+
+    // Call the edge function
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
       {
@@ -16,89 +28,25 @@ export async function processDocument(file: File, userId: string) {
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
+          'x-user-id': session.user.id
         },
         body: JSON.stringify({
-          userId,
-          fileContent,
-          fileName,
-          fileType,
-        }),
+          fileData,
+          fileName: file.name,
+          fileHash
+        })
       }
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error || 
-        `Server responded with status ${response.status}`
-      );
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to process document');
     }
 
     const result = await response.json();
-    
-    if (!result.documentId) {
-      throw new Error('Invalid response: missing documentId');
-    }
-
     return result;
   } catch (error) {
     console.error('Error processing document:', error);
-    throw new Error(
-      error instanceof Error 
-        ? error.message 
-        : 'Failed to process document'
-    );
-  }
-}
-
-export async function findSimilarDocuments(content: string, userId: string) {
-  try {
-    // Get embedding for search content
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-embedding`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error || 
-        `Server responded with status ${response.status}`
-      );
-    }
-
-    const { embedding } = await response.json();
-
-    if (!embedding) {
-      throw new Error('Invalid response: missing embedding');
-    }
-
-    // Search for similar documents
-    const { data: similarDocuments, error } = await supabase.rpc(
-      'match_documents',
-      {
-        query_embedding: embedding,
-        match_threshold: 0.8,
-        match_count: 5,
-        user_id: userId,
-      }
-    );
-
-    if (error) throw error;
-    return similarDocuments;
-  } catch (error) {
-    console.error('Error finding similar documents:', error);
-    throw new Error(
-      error instanceof Error 
-        ? error.message 
-        : 'Failed to find similar documents'
-    );
+    throw error;
   }
 }

@@ -1,6 +1,5 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.7";
-import { Configuration, OpenAIApi } from "npm:openai@4.28.0";
-import { createHash } from "npm:crypto@1.0.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -18,18 +17,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
-
-    if (!supabaseUrl || !supabaseKey || !openaiKey) {
-      throw new Error('Missing required environment variables');
-    }
-
     const supabaseClient = createClient(
-      supabaseUrl,
-      supabaseKey,
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         auth: {
           autoRefreshToken: false,
@@ -38,45 +28,28 @@ Deno.serve(async (req) => {
       }
     );
 
-    const openai = new OpenAIApi(
-      new Configuration({
-        apiKey: openaiKey,
-      })
-    );
+    // Get the file data from the request
+    const { fileData, fileName, fileHash } = await req.json();
 
-    // Validate request body
-    if (!req.body) {
-      throw new Error('Request body is required');
-    }
-
-    const { userId, fileContent, fileName, fileType } = await req.json();
-
-    if (!userId || !fileContent || !fileName || !fileType) {
-      throw new Error('Missing required fields in request body');
-    }
-
-    // Generate file hash for deduplication
-    const hash = createHash('sha256')
-      .update(fileContent)
-      .digest('hex');
-
-    // Check for existing document
-    const { data: existingDoc, error: existingDocError } = await supabaseClient
+    // Check if document already exists for this user
+    const { data: existingDoc, error: existingError } = await supabaseClient
       .from('user_documents')
       .select('id')
-      .eq('user_id', userId)
-      .eq('file_hash', hash)
+      .match({ 
+        user_id: req.headers.get('x-user-id'),
+        file_hash: fileHash 
+      })
       .single();
 
-    if (existingDocError && existingDocError.code !== 'PGRST116') {
-      throw existingDocError;
+    if (existingError && existingError.code !== 'PGRST116') {
+      throw existingError;
     }
 
     if (existingDoc) {
       return new Response(
         JSON.stringify({ 
-          documentId: existingDoc.id,
-          status: 'existing'
+          message: 'Document already exists',
+          documentId: existingDoc.id 
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -85,96 +58,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Store file in Supabase Storage
-    const filePath = `documents/${userId}/${hash}/${fileName}`;
-    const { error: uploadError } = await supabaseClient
-      .storage
-      .from('documents')
-      .upload(filePath, Buffer.from(fileContent));
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      throw new Error('Failed to upload file to storage');
-    }
-
-    // Create document record
+    // Store the document
     const { data: document, error: documentError } = await supabaseClient
       .from('user_documents')
       .insert({
-        user_id: userId,
+        user_id: req.headers.get('x-user-id'),
         file_name: fileName,
-        file_hash: hash,
-        file_path: filePath,
+        file_hash: fileHash,
+        file_path: `documents/${fileHash}`,
         metadata: {
-          fileType,
-          size: fileContent.length,
+          originalName: fileName,
+          processedAt: new Date().toISOString()
         }
       })
       .select()
       .single();
 
-    if (documentError) {
-      console.error('Document creation error:', documentError);
-      throw new Error('Failed to create document record');
-    }
+    if (documentError) throw documentError;
 
-    if (!document) {
-      throw new Error('Document record not created');
-    }
+    // Store the file in storage
+    const { error: storageError } = await supabaseClient
+      .storage
+      .from('documents')
+      .upload(`${fileHash}`, Buffer.from(fileData));
 
-    // Generate embeddings for content chunks
-    const chunkSize = 1000; // Adjust based on token limits
-    const chunks = [];
-    for (let i = 0; i < fileContent.length; i += chunkSize) {
-      chunks.push(fileContent.slice(i, i + chunkSize));
-    }
-
-    try {
-      const embeddings = await Promise.all(
-        chunks.map(async (chunk, index) => {
-          try {
-            const response = await openai.createEmbedding({
-              model: "text-embedding-3-small",
-              input: chunk,
-            });
-
-            if (!response.data?.data?.[0]?.embedding) {
-              throw new Error('Invalid embedding response from OpenAI');
-            }
-
-            return {
-              document_id: document.id,
-              embedding: response.data.data[0].embedding,
-              content: chunk,
-              chunk_index: index,
-            };
-          } catch (error) {
-            console.error(`Error generating embedding for chunk ${index}:`, error);
-            throw new Error('Failed to generate embeddings');
-          }
-        })
-      );
-
-      // Store embeddings
-      const { error: embeddingsError } = await supabaseClient
-        .from('document_embeddings')
-        .insert(embeddings);
-
-      if (embeddingsError) {
-        console.error('Embeddings storage error:', embeddingsError);
-        throw new Error('Failed to store embeddings');
-      }
-
-    } catch (error) {
-      console.error('Embeddings processing error:', error);
-      // Even if embeddings fail, we still return success with the document
-      console.warn('Continuing without embeddings due to error');
-    }
+    if (storageError) throw storageError;
 
     return new Response(
       JSON.stringify({ 
-        documentId: document.id,
-        status: 'success'
+        success: true,
+        documentId: document.id
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -182,12 +95,9 @@ Deno.serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Process document error:', error);
+    console.error('Error processing document:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'An unexpected error occurred',
-        details: error.toString()
-      }),
+      JSON.stringify({ error: error.message }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
