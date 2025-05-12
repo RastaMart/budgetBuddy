@@ -7,6 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, x-user-id",
+  "Access-Control-Max-Age": "86400",
 };
 
 const WEBHOOK_URL = "https://rastamart.app.n8n.cloud/webhook-test/processDocument";
@@ -52,7 +53,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: corsHeaders,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Origin": "*",
+      },
     });
   }
 
