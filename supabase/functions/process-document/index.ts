@@ -10,7 +10,7 @@ const corsHeaders = {
 
 const WEBHOOK_URL = "https://rastamart.app.n8n.cloud/webhook-test/processDocument";
 const WEBHOOK_USERNAME = "budgetbuddyStaging";
-const WEBHOOK_PASSWORD = "__n8n_BLANK_VALUE_e5362baf-c777-4d57-a609-6eaf1f9e87f6";
+const WEBHOOK_PASSWORD = "qifMek-zuvfy2-hidpeb";
 
 async function notifyWebhook(documentId: string, fileName: string) {
   const authHeader = `Basic ${base64Encode(`${WEBHOOK_USERNAME}:${WEBHOOK_PASSWORD}`)}`;
