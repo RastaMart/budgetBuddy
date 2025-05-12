@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.7";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-user-id",
 };
 
 serve(async (req) => {
