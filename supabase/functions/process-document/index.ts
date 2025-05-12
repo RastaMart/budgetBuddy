@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.7";
 import { encode as base64Encode } from "https://deno.land/std@0.208.0/encoding/base64.ts";
+import { Configuration, OpenAIApi } from "npm:openai@4.28.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,18 @@ const corsHeaders = {
 const WEBHOOK_URL = "https://rastamart.app.n8n.cloud/webhook-test/processDocument";
 const WEBHOOK_USERNAME = "budgetbuddyStaging";
 const WEBHOOK_PASSWORD = "qifMek-zuvfy2-hidpeb";
+
+const openai = new OpenAIApi(new Configuration({
+  apiKey: Deno.env.get('OPENAI_API_KEY'),
+}));
+
+async function generateEmbedding(text: string) {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-ada-002",
+    input: text,
+  });
+  return response.data[0].embedding;
+}
 
 async function notifyWebhook(documentId: string, fileName: string) {
   const authHeader = `Basic ${base64Encode(`${WEBHOOK_USERNAME}:${WEBHOOK_PASSWORD}`)}`;
@@ -56,14 +69,15 @@ serve(async (req) => {
     );
 
     // Get the file data from the request
-    const { fileData, fileName, fileHash } = await req.json();
+    const { fileData, fileName, fileHash, content } = await req.json();
+    const userId = req.headers.get('x-user-id');
 
     // Check if document already exists for this user
     const { data: existingDoc, error: existingError } = await supabaseClient
       .from('user_documents')
       .select('id')
       .match({ 
-        user_id: req.headers.get('x-user-id'),
+        user_id: userId,
         file_hash: fileHash 
       })
       .single();
@@ -90,11 +104,11 @@ serve(async (req) => {
       );
     }
 
-    // Store the document
-    const { data: document, error: documentError } = await supabaseClient
+    // Store the document in user_documents
+    const { data: userDocument, error: documentError } = await supabaseClient
       .from('user_documents')
       .insert({
-        user_id: req.headers.get('x-user-id'),
+        user_id: userId,
         file_name: fileName,
         file_hash: fileHash,
         file_path: `documents/${fileHash}`,
@@ -108,6 +122,27 @@ serve(async (req) => {
 
     if (documentError) throw documentError;
 
+    // Generate embedding for the content
+    const embedding = await generateEmbedding(content);
+
+    // Store in documents table
+    const { data: document, error: embeddingError } = await supabaseClient
+      .from('documents')
+      .insert({
+        content: content,
+        metadata: {
+          user_id: userId,
+          document_id: userDocument.id,
+          file_name: fileName,
+          created_at: new Date().toISOString()
+        },
+        embedding: embedding
+      })
+      .select()
+      .single();
+
+    if (embeddingError) throw embeddingError;
+
     // Store the file in storage
     const { error: storageError } = await supabaseClient
       .storage
@@ -117,13 +152,13 @@ serve(async (req) => {
     if (storageError) throw storageError;
 
     // Notify webhook about new document
-    const webhookResponse = await notifyWebhook(document.id, fileName);
+    const webhookResponse = await notifyWebhook(userDocument.id, fileName);
     console.log('Webhook response for new document:', webhookResponse);
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        documentId: document.id,
+        documentId: userDocument.id,
         webhookResponse
       }),
       {
