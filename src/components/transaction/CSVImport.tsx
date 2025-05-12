@@ -7,11 +7,13 @@ import { Account } from '../../types/account';
 import { Transaction } from '../../types/transaction';
 import { Amount } from '../shared/Amount';
 import { format, parseISO } from 'date-fns';
-import { parseDate, cleanAmount, cleanDescription } from '../../utils/dateParser';
+import {
+  parseDate,
+  cleanAmount,
+  cleanDescription,
+} from '../../utils/dateParser';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
-import { processDocument } from '../../services/documentService';
-import { LoadingSpinner } from '../shared/LoadingSpinner';
 
 interface CSVImportProps {
   onTransactionsLoaded: (transactions: Transaction[]) => void;
@@ -29,7 +31,6 @@ export function CSVImport({
   const [csvPreview, setCsvPreview] = useState<CSVPreview | null>(null);
   const [mappingStep, setMappingStep] = useState<
     | 'initial'
-    | 'uploading'
     | 'date'
     | 'description'
     | 'amount-type'
@@ -59,24 +60,14 @@ export function CSVImport({
     CSVTransaction[]
   >([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const [documentId, setDocumentId] = useState<string | null>(null);
 
   const handleFileSelect = async (file: File) => {
     try {
-      setMappingStep('uploading');
-      setError(null);
-
-      // First, process and store the document
-      const result = await processDocument(file, user!.id);
-      setDocumentId(result.documentId);
-
-      // Then read the file for preview
       const { headers, rows } = await readCSVFile(file);
       setCsvPreview({ headers, rows });
       setMappingStep('date');
     } catch (error) {
-      setError('Error processing file. Please check the format and try again.');
-      setMappingStep('initial');
+      setError('Error processing CSV file. Please check the format and try again.');
     }
   };
 
@@ -263,7 +254,6 @@ export function CSVImport({
             assigned_date: transaction.date,
             account_id: selectedAccount,
             type: 'account',
-            document_id: documentId,
           })
           .select();
 
@@ -631,14 +621,6 @@ export function CSVImport({
     <div className="space-y-4">
       {mappingStep === 'initial' && (
         <CSVDropzone onFileSelect={handleFileSelect} error={error} />
-      )}
-      {mappingStep === 'uploading' && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-center">
-            <LoadingSpinner />
-            <span className="ml-3 text-gray-600">Processing file...</span>
-          </div>
-        </div>
       )}
       {renderMappingStep()}
     </div>
