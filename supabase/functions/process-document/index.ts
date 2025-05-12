@@ -8,6 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, x-user-id",
   "Access-Control-Max-Age": "86400",
+  "Access-Control-Allow-Credentials": "true"
 };
 
 const WEBHOOK_URL = "https://rastamart.app.n8n.cloud/webhook-test/processDocument";
@@ -53,10 +54,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: {
-        ...corsHeaders,
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: corsHeaders
     });
   }
 
@@ -75,6 +73,10 @@ serve(async (req) => {
     // Get the file data from the request
     const { fileData, fileName, fileHash, content } = await req.json();
     const userId = req.headers.get('x-user-id');
+
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
 
     // Check if document already exists for this user
     const { data: existingDoc, error: existingError } = await supabaseClient
