@@ -27,14 +27,27 @@ export async function processDocument(file: File, userId: string) {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to process document');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || 
+        `Server responded with status ${response.status}`
+      );
     }
 
     const result = await response.json();
+    
+    if (!result.documentId) {
+      throw new Error('Invalid response: missing documentId');
+    }
+
     return result;
   } catch (error) {
     console.error('Error processing document:', error);
-    throw error;
+    throw new Error(
+      error instanceof Error 
+        ? error.message 
+        : 'Failed to process document'
+    );
   }
 }
 
@@ -54,10 +67,18 @@ export async function findSimilarDocuments(content: string, userId: string) {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to get embedding');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || 
+        `Server responded with status ${response.status}`
+      );
     }
 
     const { embedding } = await response.json();
+
+    if (!embedding) {
+      throw new Error('Invalid response: missing embedding');
+    }
 
     // Search for similar documents
     const { data: similarDocuments, error } = await supabase.rpc(
@@ -74,6 +95,10 @@ export async function findSimilarDocuments(content: string, userId: string) {
     return similarDocuments;
   } catch (error) {
     console.error('Error finding similar documents:', error);
-    throw error;
+    throw new Error(
+      error instanceof Error 
+        ? error.message 
+        : 'Failed to find similar documents'
+    );
   }
 }
