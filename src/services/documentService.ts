@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-export async function processDocument(file: File) {
+export async function processDocument(file: File, userId: string) {
   try {
     // Generate file hash
     const buffer = await file.arrayBuffer();
@@ -16,10 +16,6 @@ export async function processDocument(file: File) {
       reader.readAsDataURL(file);
     });
 
-    // Get user ID from session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) throw new Error('No authenticated user');
-
     // Call the edge function
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
@@ -28,7 +24,7 @@ export async function processDocument(file: File) {
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
-          'x-user-id': session.user.id
+          'x-user-id': userId
         },
         body: JSON.stringify({
           fileData,
@@ -44,6 +40,12 @@ export async function processDocument(file: File) {
     }
 
     const result = await response.json();
+    console.log('Document processed successfully:', result);
+    
+    if (result.webhookResponse) {
+      console.log('Webhook response:', result.webhookResponse);
+    }
+
     return result;
   } catch (error) {
     console.error('Error processing document:', error);
