@@ -16,27 +16,27 @@ export async function processDocument(file: File, userId: string) {
       reader.readAsDataURL(file);
     });
 
-    // Call the edge function
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          'x-user-id': userId
-        },
-        body: JSON.stringify({
-          fileData,
-          fileName: file.name,
-          fileHash
-        })
-      }
-    );
+    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`;
+    console.log('Calling Edge Function:', functionUrl);
+
+    // Call the edge function with improved error handling
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'x-user-id': userId
+      },
+      body: JSON.stringify({
+        fileData,
+        fileName: file.name,
+        fileHash
+      })
+    });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to process document');
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(errorData.message || `Failed to process document: ${response.status}`);
     }
 
     const result = await response.json();
@@ -49,6 +49,6 @@ export async function processDocument(file: File, userId: string) {
     return result;
   } catch (error) {
     console.error('Error processing document:', error);
-    throw error;
+    throw new Error(`Document processing failed: ${error.message}`);
   }
 }

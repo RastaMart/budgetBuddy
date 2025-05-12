@@ -11,42 +11,74 @@ const corsHeaders = {
   "Access-Control-Allow-Credentials": "true"
 };
 
-const WEBHOOK_URL = "https://rastamart.app.n8n.cloud/webhook-test/processDocument";
-const WEBHOOK_USERNAME = "budgetbuddyStaging";
-const WEBHOOK_PASSWORD = "qifMek-zuvfy2-hidpeb";
+const WEBHOOK_URL = Deno.env.get('WEBHOOK_URL') || "https://rastamart.app.n8n.cloud/webhook-test/processDocument";
+const WEBHOOK_USERNAME = Deno.env.get('WEBHOOK_USERNAME') || "budgetbuddyStaging";
+const WEBHOOK_PASSWORD = Deno.env.get('WEBHOOK_PASSWORD') || "qifMek-zuvfy2-hidpeb";
+
+// Verify environment variables
+const requiredEnvVars = {
+  'OPENAI_API_KEY': Deno.env.get('OPENAI_API_KEY'),
+  'SUPABASE_URL': Deno.env.get('SUPABASE_URL'),
+  'SUPABASE_SERVICE_ROLE_KEY': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+};
+
+Object.entries(requiredEnvVars).forEach(([key, value]) => {
+  if (!value) {
+    console.error(`Missing required environment variable: ${key}`);
+  }
+});
 
 const openai = new OpenAIApi(new Configuration({
-  apiKey: Deno.env.get('OPENAI_API_KEY'),
+  apiKey: requiredEnvVars.OPENAI_API_KEY,
 }));
 
 async function generateEmbedding(text: string) {
-  const response = await openai.embeddings.create({
-    model: "text-embedding-ada-002",
-    input: text,
-  });
-  return response.data[0].embedding;
+  try {
+    console.log('Generating embedding for text...');
+    const response = await openai.embeddings.create({
+      model: "text-embedding-ada-002",
+      input: text,
+    });
+    console.log('Embedding generated successfully');
+    return response.data[0].embedding;
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    throw new Error(`Failed to generate embedding: ${error.message}`);
+  }
 }
 
 async function notifyWebhook(documentId: string, fileName: string) {
-  const authHeader = `Basic ${base64Encode(`${WEBHOOK_USERNAME}:${WEBHOOK_PASSWORD}`)}`;
-  
-  const response = await fetch(WEBHOOK_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': authHeader
-    },
-    body: JSON.stringify({
-      documentId,
-      fileName,
-      processedAt: new Date().toISOString()
-    })
-  });
+  try {
+    console.log(`Notifying webhook for document ${documentId}`);
+    const authHeader = `Basic ${base64Encode(`${WEBHOOK_USERNAME}:${WEBHOOK_PASSWORD}`)}`;
+    
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader
+      },
+      body: JSON.stringify({
+        documentId,
+        fileName,
+        processedAt: new Date().toISOString()
+      })
+    });
 
-  return {
-    status: response.status,
-    body: await response.text()
-  };
+    const responseText = await response.text();
+    console.log('Webhook response:', response.status, responseText);
+
+    return {
+      status: response.status,
+      body: responseText
+    };
+  } catch (error) {
+    console.error('Error notifying webhook:', error);
+    return {
+      status: 500,
+      body: `Failed to notify webhook: ${error.message}`
+    };
+  }
 }
 
 serve(async (req) => {
@@ -59,9 +91,10 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Creating Supabase client...');
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      requiredEnvVars.SUPABASE_URL ?? '',
+      requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY ?? '',
       {
         auth: {
           autoRefreshToken: false,
@@ -78,6 +111,7 @@ serve(async (req) => {
       throw new Error('User ID is required');
     }
 
+    console.log('Checking for existing document...');
     // Check if document already exists for this user
     const { data: existingDoc, error: existingError } = await supabaseClient
       .from('user_documents')
@@ -89,13 +123,14 @@ serve(async (req) => {
       .single();
 
     if (existingError && existingError.code !== 'PGRST116') {
+      console.error('Error checking existing document:', existingError);
       throw existingError;
     }
 
     if (existingDoc) {
+      console.log('Document already exists:', existingDoc.id);
       // Notify webhook about existing document
       const webhookResponse = await notifyWebhook(existingDoc.id, fileName);
-      console.log('Webhook response for existing document:', webhookResponse);
 
       return new Response(
         JSON.stringify({ 
@@ -110,6 +145,7 @@ serve(async (req) => {
       );
     }
 
+    console.log('Storing document in user_documents...');
     // Store the document in user_documents
     const { data: userDocument, error: documentError } = await supabaseClient
       .from('user_documents')
@@ -126,40 +162,51 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (documentError) throw documentError;
+    if (documentError) {
+      console.error('Error storing document:', documentError);
+      throw documentError;
+    }
 
-    // Generate embedding for the content
-    const embedding = await generateEmbedding(content);
+    if (content) {
+      console.log('Generating embedding for content...');
+      // Generate embedding for the content
+      const embedding = await generateEmbedding(content);
 
-    // Store in documents table
-    const { data: document, error: embeddingError } = await supabaseClient
-      .from('documents')
-      .insert({
-        content: content,
-        metadata: {
-          user_id: userId,
-          document_id: userDocument.id,
-          file_name: fileName,
-          created_at: new Date().toISOString()
-        },
-        embedding: embedding
-      })
-      .select()
-      .single();
+      console.log('Storing document with embedding...');
+      // Store in documents table
+      const { error: embeddingError } = await supabaseClient
+        .from('documents')
+        .insert({
+          content: content,
+          metadata: {
+            user_id: userId,
+            document_id: userDocument.id,
+            file_name: fileName,
+            created_at: new Date().toISOString()
+          },
+          embedding: embedding
+        });
 
-    if (embeddingError) throw embeddingError;
+      if (embeddingError) {
+        console.error('Error storing embedding:', embeddingError);
+        throw embeddingError;
+      }
+    }
 
+    console.log('Storing file in storage...');
     // Store the file in storage
     const { error: storageError } = await supabaseClient
       .storage
       .from('documents')
       .upload(`${fileHash}`, Buffer.from(fileData));
 
-    if (storageError) throw storageError;
+    if (storageError) {
+      console.error('Error storing file:', storageError);
+      throw storageError;
+    }
 
     // Notify webhook about new document
     const webhookResponse = await notifyWebhook(userDocument.id, fileName);
-    console.log('Webhook response for new document:', webhookResponse);
 
     return new Response(
       JSON.stringify({ 
@@ -175,7 +222,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing document:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
