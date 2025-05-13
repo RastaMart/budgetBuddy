@@ -42,6 +42,11 @@ ADD COLUMN IF NOT EXISTS document_id uuid REFERENCES user_documents(id) ON DELET
 ALTER TABLE user_documents ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for user_documents
+DROP POLICY IF EXISTS "Users can insert their own documents" ON user_documents;
+DROP POLICY IF EXISTS "Users can view their own documents" ON user_documents;
+DROP POLICY IF EXISTS "Users can update their own documents" ON user_documents;
+DROP POLICY IF EXISTS "Users can delete their own documents" ON user_documents;
+
 CREATE POLICY "Users can insert their own documents"
 ON user_documents FOR INSERT TO authenticated
 WITH CHECK (auth.uid() = user_id);
@@ -68,6 +73,8 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- Create storage policies
+
+DROP POLICY IF EXISTS "Authenticated users can upload files" ON storage.objects;
 CREATE POLICY "Authenticated users can upload files"
 ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (
@@ -75,6 +82,7 @@ WITH CHECK (
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can view their own files" ON storage.objects;
 CREATE POLICY "Users can view their own files"
 ON storage.objects FOR SELECT TO authenticated
 USING (
@@ -82,6 +90,7 @@ USING (
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can update their own files" ON storage.objects;
 CREATE POLICY "Users can update their own files"
 ON storage.objects FOR UPDATE TO authenticated
 USING (
@@ -89,6 +98,7 @@ USING (
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can delete their own files" ON storage.objects;
 CREATE POLICY "Users can delete their own files"
 ON storage.objects FOR DELETE TO authenticated
 USING (

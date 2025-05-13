@@ -98,7 +98,9 @@ export function CSVImport({
       setCsvPreview({ headers, rows });
       setMappingStep('date');
     } catch (error) {
-      setError('Error processing CSV file. Please check the format and try again.');
+      setError(
+        'Error processing CSV file. Please check the format and try again.'
+      );
       setMappingStep('initial');
     }
   };
@@ -286,7 +288,7 @@ export function CSVImport({
             assigned_date: transaction.date,
             account_id: selectedAccount,
             type: 'account',
-            document_id: uploadedDocument?.id
+            document_id: uploadedDocument?.id,
           })
           .select();
 
@@ -404,8 +406,8 @@ export function CSVImport({
                   Review Transactions
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Select which transactions to import. Duplicates are unselected by
-                  default.
+                  Select which transactions to import. Duplicates are unselected
+                  by default.
                 </p>
               </div>
 
@@ -449,7 +451,9 @@ export function CSVImport({
                         <input
                           type="checkbox"
                           checked={parsedTransactions.every((t) => t.selected)}
-                          onChange={(e) => toggleAllTransactions(e.target.checked)}
+                          onChange={(e) =>
+                            toggleAllTransactions(e.target.checked)
+                          }
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
                       </th>
