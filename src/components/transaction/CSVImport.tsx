@@ -14,6 +14,7 @@ import {
 } from '../../utils/dateParser';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
+import { uploadCSVFile, getFileContent } from '../../services/storageService';
 
 interface CSVImportProps {
   onTransactionsLoaded: (transactions: Transaction[]) => void;
@@ -33,6 +34,7 @@ export function CSVImport({
   const [csvPreview, setCsvPreview] = useState<CSVPreview | null>(null);
   const [mappingStep, setMappingStep] = useState<
     | 'initial'
+    | 'uploading'
     | 'date'
     | 'description'
     | 'amount-type'
@@ -62,6 +64,10 @@ export function CSVImport({
     CSVTransaction[]
   >([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
+  const [uploadedDocument, setUploadedDocument] = useState<{
+    id: string;
+    file_path: string;
+  } | null>(null);
 
   useEffect(() => {
     if (initialFile) {
@@ -71,11 +77,29 @@ export function CSVImport({
 
   const handleFileSelect = async (file: File) => {
     try {
-      const { headers, rows } = await readCSVFile(file);
+      setMappingStep('uploading');
+      setError(null);
+
+      // Upload file to storage
+      const document = await uploadCSVFile(file, user.id);
+      if (!document) {
+        throw new Error('Failed to upload file');
+      }
+      setUploadedDocument(document);
+
+      // Get file content from storage
+      const content = await getFileContent(document.file_path);
+      if (!content) {
+        throw new Error('Failed to read file content');
+      }
+
+      // Parse CSV content
+      const { headers, rows } = await readCSVFile(content);
       setCsvPreview({ headers, rows });
       setMappingStep('date');
     } catch (error) {
       setError('Error processing CSV file. Please check the format and try again.');
+      setMappingStep('initial');
     }
   };
 
@@ -262,6 +286,7 @@ export function CSVImport({
             assigned_date: transaction.date,
             account_id: selectedAccount,
             type: 'account',
+            document_id: uploadedDocument?.id
           })
           .select();
 
