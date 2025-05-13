@@ -17,16 +17,36 @@ export async function uploadCSVFile(file: File, userId: string): Promise<Uploade
     const wordArray = WordArray.create(new Uint8Array(buffer));
     const hash = sha256(wordArray).toString(Hex);
 
-    // Check if file already exists
-    const { data: existingDoc } = await supabase
+    // Check if file already exists - using limit(1) instead of single()
+    const { data: existingDocs } = await supabase
       .from('user_documents')
       .select('*')
       .eq('user_id', userId)
       .eq('file_hash', hash)
-      .single();
+      .limit(1);
 
-    if (existingDoc) {
-      return existingDoc;
+    // If we found an existing document, return it
+    if (existingDocs && existingDocs.length > 0) {
+      return existingDocs[0];
+    }
+
+    // Create storage bucket if it doesn't exist
+    const { data: buckets } = await supabase
+      .storage
+      .listBuckets();
+    
+    const csvBucketExists = buckets?.some(bucket => bucket.name === 'csv-uploads');
+    
+    if (!csvBucketExists) {
+      const { error: bucketError } = await supabase
+        .storage
+        .createBucket('csv-uploads', {
+          public: false,
+          fileSizeLimit: 52428800, // 50MB
+          allowedMimeTypes: ['text/csv', 'application/vnd.ms-excel']
+        });
+
+      if (bucketError) throw bucketError;
     }
 
     // Upload file to storage
