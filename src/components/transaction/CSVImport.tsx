@@ -68,7 +68,6 @@ export function CSVImport({
     id: string;
     file_path: string;
   } | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (initialFile) {
@@ -77,10 +76,7 @@ export function CSVImport({
   }, [initialFile]);
 
   const handleFileSelect = async (file: File) => {
-    if (isProcessing) return;
-    
     try {
-      setIsProcessing(true);
       setMappingStep('uploading');
       setError(null);
 
@@ -106,8 +102,6 @@ export function CSVImport({
         'Error processing CSV file. Please check the format and try again.'
       );
       setMappingStep('initial');
-    } finally {
-      setIsProcessing(false);
     }
   };
 
