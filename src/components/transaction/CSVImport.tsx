@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CSVDropzone } from './CSVDropzone';
 import { CSVColumnMapping } from './CSVColumnMapping';
-import { readCSVFile } from '../../utils/csvParser';
+import { csvMapper } from '../../services/csvProcessor/csvMapper';
 import { CSVPreview, CSVTransaction, ImportError } from '../../types/csv';
 import { Account } from '../../types/account';
 import { Transaction } from '../../types/transaction';
@@ -30,6 +30,9 @@ export function CSVImport({
   initialFile,
 }: CSVImportProps) {
   const { user } = useAuth();
+  if (!user) {
+    throw new Error('User not found');
+  }
   const [error, setError] = useState<string | null>(null);
   const [csvPreview, setCsvPreview] = useState<CSVPreview | null>(null);
   const [mappingStep, setMappingStep] = useState<
@@ -93,10 +96,28 @@ export function CSVImport({
         throw new Error('Failed to read file content');
       }
 
+      // processCSV
+      const {
+        success,
+        transactions,
+        formatSignature,
+        mapping,
+        confidence,
+        errorMessage,
+      } = await csvMapper.processCSV(content, user.id);
+      console.log('CSV processing result:', {
+        success,
+        transactions,
+        formatSignature,
+        mapping,
+        confidence,
+        errorMessage,
+      });
+
       // Parse CSV content
-      const { headers, rows } = await readCSVFile(content);
-      setCsvPreview({ headers, rows });
-      setMappingStep('date');
+      // const { headers, rows } = await readCSVFile(content);
+      // setCsvPreview({ headers, rows });
+      // setMappingStep('date');
     } catch (error) {
       setError(
         'Error processing CSV file. Please check the format and try again.'
