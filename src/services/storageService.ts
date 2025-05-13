@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
-import { createHash } from 'crypto-js/sha256';
+import sha256 from 'crypto-js/sha256';
+import Hex from 'crypto-js/enc-hex';
+import WordArray from 'crypto-js/lib-typedarrays';
 
 export interface UploadedDocument {
   id: string;
@@ -12,7 +14,8 @@ export async function uploadCSVFile(file: File, userId: string): Promise<Uploade
   try {
     // Calculate file hash
     const buffer = await file.arrayBuffer();
-    const hash = createHash(new Uint8Array(buffer)).toString();
+    const wordArray = WordArray.create(new Uint8Array(buffer));
+    const hash = sha256(wordArray).toString(Hex);
 
     // Check if file already exists
     const { data: existingDoc } = await supabase
