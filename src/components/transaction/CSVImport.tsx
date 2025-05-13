@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CSVDropzone } from './CSVDropzone';
 import { CSVColumnMapping } from './CSVColumnMapping';
 import { readCSVFile } from '../../utils/csvParser';
@@ -19,12 +19,14 @@ interface CSVImportProps {
   onTransactionsLoaded: (transactions: Transaction[]) => void;
   accounts: Account[];
   onClose?: () => void;
+  initialFile?: File;
 }
 
 export function CSVImport({
   onTransactionsLoaded,
   accounts,
   onClose,
+  initialFile,
 }: CSVImportProps) {
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,12 @@ export function CSVImport({
     CSVTransaction[]
   >([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
+
+  useEffect(() => {
+    if (initialFile) {
+      handleFileSelect(initialFile);
+    }
+  }, [initialFile]);
 
   const handleFileSelect = async (file: File) => {
     try {
