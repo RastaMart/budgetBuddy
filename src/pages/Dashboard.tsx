@@ -64,6 +64,10 @@ export function Dashboard() {
   };
 
   const handleTransactionsLoaded = () => {
+    // setShowImportModal(false);
+    // setSelectedFile(null);
+  };
+  const handleClose = () => {
     setShowImportModal(false);
     setSelectedFile(null);
   };
@@ -131,7 +135,7 @@ export function Dashboard() {
           <CSVImport
             onTransactionsLoaded={handleTransactionsLoaded}
             accounts={accounts}
-            onClose={() => setShowImportModal(false)}
+            onClose={handleClose}
             initialFile={selectedFile}
           />
         )}

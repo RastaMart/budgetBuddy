@@ -33,7 +33,7 @@ export function parseCSVLine(line: string): string[] {
 
 export function readCSVFile(
   content: string | File
-): Promise<{ headers: string[]; rows: string[][] }> {
+): Promise<{ headers: string[]; rows: string[][]; hasHeaders: boolean }> {
   return new Promise((resolve, reject) => {
     // If content is already a string, process it directly
     if (typeof content === 'string') {
@@ -77,17 +77,66 @@ export function readCSVFile(
 
 function processCSVContent(
   text: string,
-  resolve: (value: { headers: string[]; rows: string[][] }) => void,
+  resolve: (value: {
+    headers: string[];
+    rows: string[][];
+    hasHeaders: boolean;
+  }) => void,
   reject: (reason?: any) => void
 ) {
   try {
     // Handle different line endings (CRLF, LF)
     const lines = text.split(/\r\n|\n|\r/).filter((line) => line.trim());
 
-    const headers = parseCSVLine(lines[0]);
-    const rows = lines.slice(1).map((line) => parseCSVLine(line));
+    if (lines.length < 1) {
+      reject(new Error('CSV file is empty'));
+      return;
+    }
 
-    resolve({ headers, rows });
+    const firstRow = parseCSVLine(lines[0]);
+
+    // Determine if the file has headers by checking the following:
+    // 1. Are there at least 2 rows to compare?
+    // 2. Do the first row cells have string-like content while second row has numeric content?
+    // 3. Are the first row cells potentially column names (no numbers, short text)?
+    let hasHeaders = false;
+
+    if (lines.length >= 2) {
+      const secondRow = parseCSVLine(lines[1]);
+
+      // Check if the number of columns is consistent
+      if (firstRow.length === secondRow.length) {
+        // TODO Find better way to do this, don't work
+
+        // Check if first row looks like headers
+        const firstRowLooksLikeHeaders = firstRow.some((cell) => {
+          // Headers often contain text, not just numbers
+          const isNotJustNumber = isNaN(Number(cell)) || cell.trim() === '';
+          // Headers are usually shorter than typical content
+          const isReasonableLength = cell.length > 0 && cell.length < 50;
+          // Headers often have capitalized words or underscores
+          const hasHeaderFormat = /^[A-Za-z0-9_\s]+$/.test(cell);
+
+          return isNotJustNumber && isReasonableLength && hasHeaderFormat;
+        });
+
+        // Check if second row has some numeric values
+        const secondRowHasNumericValues = secondRow.some(
+          (cell) => !isNaN(Number(cell)) && cell.trim() !== ''
+        );
+
+        hasHeaders = firstRowLooksLikeHeaders && secondRowHasNumericValues;
+      }
+    }
+
+    const headers = hasHeaders
+      ? firstRow
+      : firstRow.map((_, index) => `Column ${index + 1}`);
+    const rows = hasHeaders
+      ? lines.slice(1).map((line) => parseCSVLine(line))
+      : lines.map((line) => parseCSVLine(line));
+    console.log('hasHeaders', hasHeaders);
+    resolve({ headers, rows, hasHeaders });
   } catch (error) {
     reject(new Error('Error parsing CSV content'));
   }

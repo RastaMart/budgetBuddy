@@ -5,124 +5,16 @@ import CryptoJS from 'crypto-js';
 import sha256 from 'crypto-js/sha256';
 import Hex from 'crypto-js/enc-hex';
 import WordArray from 'crypto-js/lib-typedarrays';
+import { ColumnMapping, CsvProcessResult } from '../../types/columnMapping';
+import { RawTransaction } from '../../types/transaction';
 
-interface MappedTransaction {
-  date: string;
-  description: string;
-  amount: number;
-  type: 'income' | 'expense';
-}
-
-interface ColumnMapping {
-  date?: number;
-  description?: number;
-  amount?: number;
-  incomeAmount?: number;
-  expenseAmount?: number;
-  type?: number;
-}
-
-interface CsvProcessResult {
-  success: boolean;
-  transactions?: MappedTransaction[];
-  formatSignature?: string;
-  mapping?: ColumnMapping;
-  confidence: number;
-  errorMessage?: string;
-}
+const globalSampleSize = 10;
 
 export class CsvMapper {
   /**
-   * Process a CSV file and map it to the application's transaction format
-   * @param csvContent - The CSV file content as a string
-   * @param userId - The user's ID for format caching
-   * @returns The processing result with mapped transactions
-   */
-  async processCSV(
-    csvContent: string,
-    userId: string
-  ): Promise<CsvProcessResult> {
-    try {
-      // 1. Generate a format signature for this CSV
-      const formatSignature = this.generateFormatSignature(csvContent);
-      // 2. Check cache for known format
-      const cachedMapping = await formatCache.getFormat(formatSignature);
-      console.log('Cached mapping:', cachedMapping);
-
-      if (cachedMapping) {
-        // Use the cached mapping if available
-        return this.processCsvWithMapping(
-          csvContent,
-          cachedMapping,
-          formatSignature
-        );
-      }
-
-      // 3. If no cached mapping, detect columns using heuristics
-      const { data } = parse(csvContent, {
-        header: true,
-        skipEmptyLines: true,
-      });
-      if (!data.length) {
-        return {
-          success: false,
-          confidence: 0,
-          errorMessage: 'No data found in CSV',
-        };
-      }
-
-      const mapping = this.detectColumns(data);
-      const confidence = this.calculateMappingConfidence(mapping);
-
-      // 4. Process the data with the detected mapping
-      const transactions = this.mapDataToTransactions(data, mapping);
-
-      // 5. Cache the mapping if confidence is high enough
-      //   if (confidence > 0.8) {
-      //     await formatCache.saveFormat(formatSignature, mapping, userId);
-      //   }
-
-      return {
-        success: true,
-        transactions,
-        formatSignature,
-        mapping,
-        confidence,
-      };
-    } catch (error) {
-      console.error('CSV processing error:', error);
-      return {
-        success: false,
-        confidence: 0,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  }
-
-  /**
-   * Generate a unique signature for this CSV format
-   * Uses header row and sampling of data structure
-   */
-  private generateFormatSignature(csvContent: string): string {
-    const { data, meta } = parse(csvContent, {
-      preview: 5,
-      skipEmptyLines: true,
-    });
-    // Create a signature based on headers and data structure
-    const headerSignature = meta.fields?.join('|') || '';
-    const structureSignature =
-      data.length > 0 ? Object.values(data[0]).join('|') : '';
-
-    // Calculate file hash
-    const hash = CryptoJS.SHA256(headerSignature + structureSignature);
-
-    return nanoid(10) + '-' + hash.toString(CryptoJS.enc.Hex).substring(0, 20);
-  }
-
-  /**
    * Detect likely columns in CSV data using heuristics
    */
-  private detectColumns(data: any[]): ColumnMapping {
+  detectColumns(data: any[]): ColumnMapping {
     const mapping: ColumnMapping = {};
     const headers = Object.keys(data[0]);
 
@@ -213,8 +105,8 @@ export class CsvMapper {
    * Helper method to verify if a column contains date values
    */
   private columnsContainsDateValues(data: any[], columnIndex: number): boolean {
-    // Sample the first 5 rows or all rows if less than 5
-    const sampleSize = Math.min(5, data.length);
+    // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
+    const sampleSize = Math.min(globalSampleSize, data.length);
     let dateCount = 0;
 
     for (let i = 0; i < sampleSize; i++) {
@@ -261,15 +153,17 @@ export class CsvMapper {
       }
     }
 
-    // Try to create a Date object and see if it's valid
-    const dateObj = new Date(value);
-    if (!isNaN(dateObj.getTime())) {
-      // Additional validation - check if the year is reasonable (not too far in past/future)
-      const year = dateObj.getFullYear();
-      const currentYear = new Date().getFullYear();
+    // // Try to create a Date object and see if it's valid
+    // const dateObj = new Date(value);
+    // if (!isNaN(dateObj.getTime())) {
+    //   // Additional validation - check if the year is reasonable (not too far in past/future)
+    //   const year = dateObj.getFullYear();
+    //   const currentYear = new Date().getFullYear();
 
-      return year >= 1990 && year <= currentYear + 1;
-    }
+    //   const isDateValid = year >= 1990 && year <= currentYear + 1;
+    //   console.log('date fromm new Date', dateObj);
+    //   return isDateValid;
+    // }
 
     return false;
   }
@@ -347,8 +241,8 @@ export class CsvMapper {
     data: any[],
     columnIndex: number
   ): boolean {
-    // Sample the first 5 rows or all rows if less than 5
-    const sampleSize = Math.min(5, data.length);
+    // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
+    const sampleSize = Math.min(globalSampleSize, data.length);
     let textCount = 0;
     let avgLength = 0;
 
@@ -374,7 +268,7 @@ export class CsvMapper {
     }
 
     // Descriptions typically have a decent length and appear in most rows
-    return textCount / sampleSize >= 0.7 && avgLength > 5;
+    return textCount / sampleSize >= 0.7 && avgLength > globalSampleSize;
   }
 
   /**
@@ -444,11 +338,81 @@ export class CsvMapper {
   }
 
   /**
+   * Check if a column likely contains enumeration values
+   */
+  private isLikelyEnumration(data: any[], columnIndex: number): boolean {
+    // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
+    const sampleSize = Math.min(globalSampleSize, data.length);
+    let chanceOfEnumaration = 0;
+    let lastValue = 0;
+
+    for (let i = 0; i < sampleSize; i++) {
+      const value = data[i][Object.keys(data[i])[columnIndex]];
+      if (!value) continue;
+      // if (typeof value !== 'number') continue;
+      const intValue = parseInt(value, 10);
+      if (isNaN(intValue)) continue;
+
+      if (intValue - lastValue === 1 || intValue + lastValue === 1) {
+        chanceOfEnumaration += 1;
+      } else {
+        chanceOfEnumaration -= 1;
+      }
+      lastValue = value;
+    }
+
+    // If more than 60% of sample rows contain enumeration values, consider it an enumeration column
+    return chanceOfEnumaration / sampleSize >= 0.6;
+  }
+
+  /**
+   * Check if a column likely contains summary values
+   */
+  private isLikelySummaryColumn(data: any[], columnIndex: number): boolean {
+    if (columnIndex !== 13) return false;
+    console.log('---------------------------');
+    // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
+    const sampleSize = Math.min(globalSampleSize, data.length);
+    let chanceOfSummary = 0;
+    let lastCurrentColumns = null;
+    for (let rowIndex = 0; rowIndex < sampleSize; rowIndex++) {
+      const row = data[rowIndex];
+      const currentColumn = parseFloat(row[columnIndex]);
+      if (isNaN(currentColumn)) continue;
+
+      const othersColumns = row
+        .filter((_, index) => index !== columnIndex && parseFloat(row[index]))
+        .map((_) => parseFloat(_));
+
+      console.log({ row, currentColumn, lastCurrentColumns, othersColumns });
+      for (let i = 0; i < othersColumns.length; i++) {
+        if (lastCurrentColumns !== null) {
+          if (
+            currentColumn - othersColumns[i] === lastCurrentColumns ||
+            currentColumn + othersColumns[i] === lastCurrentColumns
+          ) {
+            chanceOfSummary++;
+          }
+        }
+      }
+
+      lastCurrentColumns = currentColumn;
+      // if (!value) continue;
+      // // if (typeof value !== 'number') continue;
+      // const intValue = parseInt(value, 10);
+      // if (isNaN(intValue)) continue;
+      // intData[i].push(intValue);
+    }
+    // If more than 30% of sample rows contain enumeration values, consider it an enumeration column
+    return chanceOfSummary / sampleSize >= 0.3;
+  }
+
+  /**
    * Check if a column likely contains numeric values (to exclude from description candidates)
    */
   private isLikelyNumericColumn(data: any[], columnIndex: number): boolean {
-    // Sample the first 5 rows or all rows if less than 5
-    const sampleSize = Math.min(5, data.length);
+    // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
+    const sampleSize = Math.min(globalSampleSize, data.length);
     let numericCount = 0;
 
     for (let i = 0; i < sampleSize; i++) {
@@ -536,6 +500,10 @@ export class CsvMapper {
       }
     }
 
+    console.log('1', {
+      incomeColumn,
+      expenseColumn,
+    });
     // Check for expense column
     for (const expenseName of expenseColumnNames) {
       const columnIndex = headers.findIndex((header) =>
@@ -548,11 +516,19 @@ export class CsvMapper {
       }
     }
 
+    console.log('2', {
+      incomeColumn,
+      expenseColumn,
+    });
     // If we found both income and expense columns, we're done
     if (incomeColumn !== undefined && expenseColumn !== undefined) {
       return { incomeColumn, expenseColumn };
     }
 
+    console.log('3', {
+      incomeColumn,
+      expenseColumn,
+    });
     // Next, try to find a single amount column
     let amountColumn: number | undefined;
 
@@ -567,15 +543,37 @@ export class CsvMapper {
         break;
       }
     }
-
+    console.log('4', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     // If not found by name, find the most likely amount column by content analysis
     if (amountColumn === undefined) {
       const candidateColumns = [];
 
       for (let i = 0; i < headers.length; i++) {
+        console.log('------ testing column', i);
         // Skip date and description columns
-        if (this.isLikelyDateColumn(data, i)) continue;
-        if (i === this.findDescriptionColumn(data, headers)) continue;
+
+        const isLikelyDateColumn = this.isLikelyDateColumn(data, i);
+        console.log(i, 'isLikelyDateColumn', isLikelyDateColumn);
+        if (isLikelyDateColumn) continue;
+
+        const isDescritionColumn =
+          this.findDescriptionColumn(data, headers) === 1;
+        console.log(i, 'isDescritionColumn', isDescritionColumn);
+        if (isDescritionColumn) continue;
+
+        // Skip enumaration columns
+        const isEnumeration = this.isLikelyEnumration(data, i);
+        console.log(i, 'isEnumeration', isEnumeration);
+        if (isEnumeration) continue;
+
+        // Skip summary columns
+        const isSummary = this.isLikelySummaryColumn(data, i);
+        console.log(i, 'isSummary', isSummary);
+        if (isSummary) continue;
 
         // Score this column as a potential amount column
         const score = this.evaluateAmountColumn(data, i);
@@ -589,8 +587,14 @@ export class CsvMapper {
         candidateColumns.sort((a, b) => b.score - a.score);
         amountColumn = candidateColumns[0].index;
       }
+      console.log('candidateColumns', candidateColumns);
     }
 
+    console.log('5', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     // If we found a single amount column, check if it contains both positive and negative amounts
     // If so, it's a combined amount column rather than separate income/expense columns
     if (amountColumn !== undefined) {
@@ -603,6 +607,11 @@ export class CsvMapper {
       }
     }
 
+    console.log('6', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     // At this point, if we found only one of income/expense column,
     // try to find the complement using content analysis
     if (incomeColumn !== undefined && expenseColumn === undefined) {
@@ -619,16 +628,31 @@ export class CsvMapper {
       );
     }
 
+    console.log('7', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     // If we found separate income/expense columns, return those
     if (incomeColumn !== undefined || expenseColumn !== undefined) {
       return { incomeColumn, expenseColumn };
     }
 
+    console.log('8', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     // If we didn't find anything, return the best amount column candidate if available
     if (amountColumn !== undefined) {
       return { amountColumn };
     }
 
+    console.log('9', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     // If we still don't have anything, look for any column that might be numeric
     const numericColumns = headers
       .map((_, index) => {
@@ -636,10 +660,20 @@ export class CsvMapper {
       })
       .filter((col) => col.score > 0);
 
+    console.log('10', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     if (numericColumns.length > 0) {
       return { amountColumn: numericColumns[0].index };
     }
 
+    console.log('11', {
+      amountColumn,
+      incomeColumn,
+      expenseColumn,
+    });
     // If all else fails, return empty
     return {};
   }
@@ -648,8 +682,8 @@ export class CsvMapper {
    * Check if a column likely contains amount values
    */
   private isLikelyAmountColumn(data: any[], columnIndex: number): boolean {
-    // Sample the first 5 rows or all rows if less than 5
-    const sampleSize = Math.min(5, data.length);
+    // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
+    const sampleSize = Math.min(globalSampleSize, data.length);
     let amountCount = 0;
 
     for (let i = 0; i < sampleSize; i++) {
@@ -680,6 +714,9 @@ export class CsvMapper {
    * Evaluate how likely a column is to contain transaction amounts
    */
   private evaluateAmountColumn(data: any[], columnIndex: number): number {
+    // TODO check si row = last row same as previous row
+    // TODO check si row = last row + or - an other number field
+
     // Sample rows
     const sampleSize = Math.min(10, data.length);
     let score = 0;
@@ -986,7 +1023,7 @@ export class CsvMapper {
    */
   private evaluateTypeColumn(data: any[], columnIndex: number): number {
     // Sample rows
-    const sampleSize = Math.min(15, data.length);
+    const sampleSize = Math.min(globalSampleSize * 3, data.length);
     let score = 0;
 
     // Common type indicator values
@@ -1091,7 +1128,7 @@ export class CsvMapper {
   /**
    * Calculate confidence level in the column mapping
    */
-  private calculateMappingConfidence(mapping: ColumnMapping): number {
+  calculateMappingConfidence(mapping: ColumnMapping): number {
     let confidence = 0;
 
     // Required fields check (date and either description or amount are essential)
@@ -1170,11 +1207,8 @@ export class CsvMapper {
   /**
    * Map the CSV data to the application's transaction format
    */
-  private mapDataToTransactions(
-    data: any[],
-    mapping: ColumnMapping
-  ): MappedTransaction[] {
-    const transactions: MappedTransaction[] = [];
+  mapDataToTransactions(data: any[], mapping: ColumnMapping): RawTransaction[] {
+    const rawTransactions: RawTransaction[] = [];
 
     // If we don't have the minimum required fields, return empty array
     if (
@@ -1183,7 +1217,7 @@ export class CsvMapper {
         mapping.incomeAmount === undefined &&
         mapping.expenseAmount === undefined)
     ) {
-      return transactions;
+      return rawTransactions;
     }
 
     // Process each row in the CSV data
@@ -1258,11 +1292,10 @@ export class CsvMapper {
 
         // Only add transactions with non-zero amounts
         if (amount !== 0) {
-          transactions.push({
+          rawTransactions.push({
             date: formattedDate,
             description,
             amount,
-            type,
           });
         }
       } catch (error) {
@@ -1271,7 +1304,7 @@ export class CsvMapper {
       }
     }
 
-    return transactions;
+    return rawTransactions;
   }
 
   /**
@@ -1426,10 +1459,9 @@ export class CsvMapper {
   /**
    * Process CSV with a known mapping (from cache)
    */
-  private processCsvWithMapping(
+  processCsvWithMapping(
     csvContent: string,
-    mapping: ColumnMapping,
-    formatSignature: string
+    mapping: ColumnMapping
   ): CsvProcessResult {
     const { data } = parse(csvContent, {
       header: true,
@@ -1441,9 +1473,7 @@ export class CsvMapper {
     return {
       success: true,
       transactions,
-      formatSignature,
-      mapping,
-      confidence: 1.0,
+      confidence: this.calculateMappingConfidence(mapping),
     };
   }
 }

@@ -1,5 +1,11 @@
 export type TransactionType = 'account' | 'virtual' | 'income_distribution';
 
+export interface RawTransaction {
+  amount: number;
+  description: string;
+  date: string;
+}
+
 export interface Transaction {
   id: string;
   user_id: string;
