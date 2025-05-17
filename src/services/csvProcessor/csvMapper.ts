@@ -7,10 +7,16 @@ import Hex from 'crypto-js/enc-hex';
 import WordArray from 'crypto-js/lib-typedarrays';
 import { ColumnMapping, CsvProcessResult } from '../../types/columnMapping';
 import { RawTransaction } from '../../types/transaction';
+import {
+  mostFrequentValueOfArray,
+  valueAretheSameMoreThan,
+} from '../../utils/array';
+import Decimal from 'decimal.js';
 
 const globalSampleSize = 10;
 
 export class CsvMapper {
+  candidateAmountColumns: { index: number; score: number }[] = [];
   /**
    * Detect likely columns in CSV data using heuristics
    */
@@ -161,7 +167,6 @@ export class CsvMapper {
     //   const currentYear = new Date().getFullYear();
 
     //   const isDateValid = year >= 1990 && year <= currentYear + 1;
-    //   console.log('date fromm new Date', dateObj);
     //   return isDateValid;
     // }
 
@@ -209,8 +214,7 @@ export class CsvMapper {
     }
 
     // If no match by name, look for columns with characteristics of descriptions
-    const candidateColumns = [];
-
+    const candidateColumns: { index: number; score: number }[] = [];
     for (let i = 0; i < headers.length; i++) {
       // Skip already identified date columns
       if (this.isLikelyDateColumn(data, i)) continue;
@@ -366,45 +370,84 @@ export class CsvMapper {
   }
 
   /**
-   * Check if a column likely contains summary values
+   * Check if a column likely contains repetitive values
    */
-  private isLikelySummaryColumn(data: any[], columnIndex: number): boolean {
-    if (columnIndex !== 13) return false;
-    console.log('---------------------------');
+  private isLikelyRepetitive(data: any[], columnIndex: number): boolean {
     // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
     const sampleSize = Math.min(globalSampleSize, data.length);
+    let chanceOfRepetition = 0;
+    let lastValue = 0;
+
+    for (let i = 0; i < sampleSize; i++) {
+      const value = data[i][Object.keys(data[i])[columnIndex]];
+      if (!value) continue;
+      if (value == lastValue) {
+        chanceOfRepetition += 1;
+      } else {
+        chanceOfRepetition -= 1;
+      }
+      lastValue = value;
+    }
+
+    // If more than 60% of sample rows contain enumeration values, consider it an enumeration column
+    return chanceOfRepetition / sampleSize >= 0.4;
+  }
+  /**
+   * Check if a column likely contains summary values
+   */
+  private isLikelySummaryColumn(
+    data: any[],
+    columnIndex: number
+  ): {
+    chanceOfSummary: boolean;
+    expenseColumn: number | null;
+    incomeColumn: number | null;
+  } {
+    if (columnIndex !== 13) {
+      return {
+        chanceOfSummary: false,
+        expenseColumn: null,
+        incomeColumn: null,
+      };
+    }
+    // Sample the first [globalSampleSize] rows or all rows if less than [globalSampleSize]
+    const sampleSize = data.length; // Math.min(globalSampleSize, data.length);
     let chanceOfSummary = 0;
     let lastCurrentColumns = null;
+    const chanceOfExpense = [];
+    const chanceOfIncome = [];
     for (let rowIndex = 0; rowIndex < sampleSize; rowIndex++) {
       const row = data[rowIndex];
-      const currentColumn = parseFloat(row[columnIndex]);
-      if (isNaN(currentColumn)) continue;
+      const currentColumn = new Decimal(row[columnIndex]);
+      if (currentColumn.isNaN()) continue;
+      for (let i = 0; i < row.length; i++) {
+        if (row[i] === undefined) continue;
+        const currentValule = new Decimal(parseFloat(row[i]));
+        if (!currentValule || currentValule.isNaN()) continue;
 
-      const othersColumns = row
-        .filter((_, index) => index !== columnIndex && parseFloat(row[index]))
-        .map((_) => parseFloat(_));
-
-      console.log({ row, currentColumn, lastCurrentColumns, othersColumns });
-      for (let i = 0; i < othersColumns.length; i++) {
         if (lastCurrentColumns !== null) {
-          if (
-            currentColumn - othersColumns[i] === lastCurrentColumns ||
-            currentColumn + othersColumns[i] === lastCurrentColumns
-          ) {
+          if (lastCurrentColumns.minus(currentValule).eq(currentColumn)) {
+            chanceOfExpense.push(i);
+            chanceOfSummary++;
+          } else if (lastCurrentColumns.plus(currentValule).eq(currentColumn)) {
+            chanceOfIncome.push(i);
             chanceOfSummary++;
           }
         }
       }
 
       lastCurrentColumns = currentColumn;
-      // if (!value) continue;
-      // // if (typeof value !== 'number') continue;
-      // const intValue = parseInt(value, 10);
-      // if (isNaN(intValue)) continue;
-      // intData[i].push(intValue);
     }
-    // If more than 30% of sample rows contain enumeration values, consider it an enumeration column
-    return chanceOfSummary / sampleSize >= 0.3;
+
+    return {
+      chanceOfSummary: chanceOfSummary / sampleSize >= 0.3,
+      expenseColumn: valueAretheSameMoreThan(chanceOfExpense, 0.6)
+        ? mostFrequentValueOfArray(chanceOfExpense)
+        : null,
+      incomeColumn: valueAretheSameMoreThan(chanceOfIncome, 0.6)
+        ? mostFrequentValueOfArray(chanceOfIncome)
+        : null,
+    };
   }
 
   /**
@@ -500,10 +543,6 @@ export class CsvMapper {
       }
     }
 
-    console.log('1', {
-      incomeColumn,
-      expenseColumn,
-    });
     // Check for expense column
     for (const expenseName of expenseColumnNames) {
       const columnIndex = headers.findIndex((header) =>
@@ -516,19 +555,11 @@ export class CsvMapper {
       }
     }
 
-    console.log('2', {
-      incomeColumn,
-      expenseColumn,
-    });
     // If we found both income and expense columns, we're done
     if (incomeColumn !== undefined && expenseColumn !== undefined) {
       return { incomeColumn, expenseColumn };
     }
 
-    console.log('3', {
-      incomeColumn,
-      expenseColumn,
-    });
     // Next, try to find a single amount column
     let amountColumn: number | undefined;
 
@@ -543,58 +574,56 @@ export class CsvMapper {
         break;
       }
     }
-    console.log('4', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
     // If not found by name, find the most likely amount column by content analysis
-    if (amountColumn === undefined) {
-      const candidateColumns = [];
 
+    if (amountColumn === undefined) {
       for (let i = 0; i < headers.length; i++) {
-        console.log('------ testing column', i);
         // Skip date and description columns
 
         const isLikelyDateColumn = this.isLikelyDateColumn(data, i);
-        console.log(i, 'isLikelyDateColumn', isLikelyDateColumn);
         if (isLikelyDateColumn) continue;
 
         const isDescritionColumn =
           this.findDescriptionColumn(data, headers) === 1;
-        console.log(i, 'isDescritionColumn', isDescritionColumn);
         if (isDescritionColumn) continue;
 
         // Skip enumaration columns
         const isEnumeration = this.isLikelyEnumration(data, i);
-        console.log(i, 'isEnumeration', isEnumeration);
         if (isEnumeration) continue;
 
+        // Skip repetitiveID
+        const isRepetitive = this.isLikelyRepetitive(data, i);
+        if (isRepetitive) continue;
+
         // Skip summary columns
-        const isSummary = this.isLikelySummaryColumn(data, i);
-        console.log(i, 'isSummary', isSummary);
-        if (isSummary) continue;
+
+        const {
+          chanceOfSummary,
+          expenseColumn: expenseColumnViaSummary,
+          incomeColumn: incomeColumnViaSummary,
+        } = this.isLikelySummaryColumn(data, i);
+
+        if (expenseColumnViaSummary) expenseColumn = expenseColumnViaSummary;
+        if (incomeColumnViaSummary) incomeColumn = incomeColumnViaSummary;
+        if (chanceOfSummary) continue;
 
         // Score this column as a potential amount column
         const score = this.evaluateAmountColumn(data, i);
         if (score > 0) {
-          candidateColumns.push({ index: i, score });
+          this.candidateAmountColumns.push({ index: i, score });
         }
       }
 
-      // Sort by score and pick the best one
-      if (candidateColumns.length > 0) {
-        candidateColumns.sort((a, b) => b.score - a.score);
-        amountColumn = candidateColumns[0].index;
+      if (this.candidateAmountColumns.length === 1) {
+        amountColumn = this.candidateAmountColumns[0].index;
       }
-      console.log('candidateColumns', candidateColumns);
     }
 
-    console.log('5', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
+    // If we found both income and expense columns, we're done
+    if (incomeColumn !== undefined && expenseColumn !== undefined) {
+      return { incomeColumn, expenseColumn };
+    }
+
     // If we found a single amount column, check if it contains both positive and negative amounts
     // If so, it's a combined amount column rather than separate income/expense columns
     if (amountColumn !== undefined) {
@@ -607,11 +636,6 @@ export class CsvMapper {
       }
     }
 
-    console.log('6', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
     // At this point, if we found only one of income/expense column,
     // try to find the complement using content analysis
     if (incomeColumn !== undefined && expenseColumn === undefined) {
@@ -628,31 +652,16 @@ export class CsvMapper {
       );
     }
 
-    console.log('7', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
     // If we found separate income/expense columns, return those
     if (incomeColumn !== undefined || expenseColumn !== undefined) {
       return { incomeColumn, expenseColumn };
     }
 
-    console.log('8', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
     // If we didn't find anything, return the best amount column candidate if available
     if (amountColumn !== undefined) {
       return { amountColumn };
     }
 
-    console.log('9', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
     // If we still don't have anything, look for any column that might be numeric
     const numericColumns = headers
       .map((_, index) => {
@@ -660,20 +669,10 @@ export class CsvMapper {
       })
       .filter((col) => col.score > 0);
 
-    console.log('10', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
     if (numericColumns.length > 0) {
       return { amountColumn: numericColumns[0].index };
     }
 
-    console.log('11', {
-      amountColumn,
-      incomeColumn,
-      expenseColumn,
-    });
     // If all else fails, return empty
     return {};
   }
@@ -1273,7 +1272,6 @@ export class CsvMapper {
 
             if (incomeAmount > 0) {
               amount = incomeAmount;
-              type = 'income';
             }
           }
 
@@ -1284,8 +1282,7 @@ export class CsvMapper {
             const expenseAmount = this.parseAmountValue(expenseStr);
 
             if (expenseAmount > 0) {
-              amount = expenseAmount;
-              type = 'expense';
+              amount = -expenseAmount;
             }
           }
         }

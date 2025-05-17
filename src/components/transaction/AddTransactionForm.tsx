@@ -126,7 +126,6 @@ export function AddTransactionForm({
 
   const handleBulkImport = async (transactions: Transaction[]) => {
     // Check rules for each transaction
-    console.log('handleBulkImport', transactions);
     const processedTransactions = await Promise.all(
       transactions.map(async (transaction) => {
         const { data: t, error } = await supabase
@@ -135,7 +134,6 @@ export function AddTransactionForm({
           .eq('id', transaction.id)
           .single();
         if (error) throw error;
-        console.log('t', t);
         return {
           ...transaction,
           category_id: t?.category_id || null,

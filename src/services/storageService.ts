@@ -39,7 +39,6 @@ export async function uploadCSVFile(
 
     // Upload file to storage
     const filePath = `${userId}/${hash}-${file.name}`;
-    console.log('Uploading file to path:', filePath);
     try {
       const { error: uploadError } = await supabase.storage
         .from('csv-uploads')

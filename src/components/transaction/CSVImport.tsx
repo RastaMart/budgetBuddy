@@ -87,7 +87,6 @@ export function CSVImport({
 
   const handleFileSelect = async (file: File) => {
     try {
-      console.log('Selected file:', file);
       csvProcessor.init(user.id);
 
       setMappingStep('processing');
@@ -99,8 +98,13 @@ export function CSVImport({
       }
       setRawContent(content);
       // processCSV
-      const { success, rawTransactions, mapping, confidence, errorMessage } =
-        await csvProcessor.processCSV(content);
+      const {
+        success,
+        rawTransactions: newRawTransactions,
+        mapping,
+        confidence,
+        errorMessage,
+      } = await csvProcessor.processCSV(content);
 
       if (!success && errorMessage) {
         throw new Error(errorMessage);
@@ -110,15 +114,13 @@ export function CSVImport({
       setCsvPreview({ headers, rows });
 
       if (success && confidence > 0.5 && mapping != null) {
-        console.log('if:', mapping);
         setColumnMapping(mapping);
-        if (rawTransactions) {
-          setRawTransactions(rawTransactions);
+        if (newRawTransactions) {
+          setRawTransactions(newRawTransactions);
         }
         setMappingStep('reviewMapping');
       } else {
         // Parse CSV content
-        console.log('else:', success, confidence, mapping);
         setMappingStep('date');
       }
     } catch (error) {
@@ -141,8 +143,9 @@ export function CSVImport({
     });
     setMappingStep('date');
   };
-  const handleAcceptMapping = () => {
-    setMappingStep('date');
+  const handleAcceptMapping = (newMapping: ColumnMapping) => {
+    setColumnMapping(newMapping);
+    processTransactions(newMapping);
   };
 
   const handleColumnSelect = async (columnIndex: number) => {
@@ -422,7 +425,6 @@ export function CSVImport({
         );
     }
   };
-  console.log('mappingStep:', mappingStep);
   return (
     <div className="space-y-4">
       {mappingStep === 'initial' && (

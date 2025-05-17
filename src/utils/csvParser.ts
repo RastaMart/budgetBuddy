@@ -135,7 +135,6 @@ function processCSVContent(
     const rows = hasHeaders
       ? lines.slice(1).map((line) => parseCSVLine(line))
       : lines.map((line) => parseCSVLine(line));
-    console.log('hasHeaders', hasHeaders);
     resolve({ headers, rows, hasHeaders });
   } catch (error) {
     reject(new Error('Error parsing CSV content'));

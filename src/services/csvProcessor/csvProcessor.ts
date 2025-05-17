@@ -51,7 +51,6 @@ export class CsvProcessor {
       const formatSignature = this.generateFormatSignature(csvContent);
       // 2. Check cache for known format
       const cachedMapping = await formatCache.getFormat(formatSignature);
-      console.log('Cached mapping:', cachedMapping);
 
       if (cachedMapping) {
         // Use the cached mapping if available
