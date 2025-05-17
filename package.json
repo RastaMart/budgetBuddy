@@ -14,7 +14,7 @@
     "bump:patch": "node scripts/bump-version.js patch",
     "bump:minor": "node scripts/bump-version.js minor",
     "bump:major": "node scripts/bump-version.js major",
-    "createSeed": "supabase db dump -x cron.job -f supabase/seed.sql --data-only"
+    "createSeed": "supabase db dump -x cron.job,storage.buckets -f supabase/seed.sql --data-only"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
