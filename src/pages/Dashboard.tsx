@@ -5,6 +5,7 @@ import { VERSION } from '../version';
 import { Upload } from 'lucide-react';
 import { Modal } from '../components/shared/Modal';
 import { CSVImport } from '../components/transaction/CSVImport';
+import { PDFReviewAnalysis } from '../components/transaction/PDFReviewAnalysis';
 import { useAccounts } from '../hooks/useAccounts';
 
 export function Dashboard() {
@@ -15,6 +16,8 @@ export function Dashboard() {
   const [isDragging, setIsDragging] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [showPDFModal, setShowPDFModal] = useState(false);
 
   useEffect(() => {
     async function checkSupabaseConnection() {
@@ -45,21 +48,33 @@ export function Dashboard() {
   };
 
   const handleDrop = (e: React.DragEvent) => {
+    console.log('handleDrop', handleDrop);
     e.preventDefault();
     setIsDragging(false);
 
     const file = e.dataTransfer.files[0];
-    if (file && file.type === 'text/csv') {
-      setSelectedFile(file);
-      setShowImportModal(true);
+    if (file) {
+      handleFileUpload(file);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const handleFileUpload = (file: File) => {
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+    if (fileExtension === 'csv') {
       setSelectedFile(file);
       setShowImportModal(true);
+    } else if (fileExtension === 'pdf') {
+      console.log('fileExtension === pdf', file);
+      setPdfFile(file);
+      setShowPDFModal(true);
     }
   };
 
@@ -67,9 +82,16 @@ export function Dashboard() {
     // setShowImportModal(false);
     // setSelectedFile(null);
   };
+
   const handleClose = () => {
     setShowImportModal(false);
     setSelectedFile(null);
+  };
+
+  const handlePDFAccept = () => {
+    console.log('Process PDF file', pdfFile);
+    setShowPDFModal(false);
+    setPdfFile(null);
   };
 
   return (
@@ -90,12 +112,12 @@ export function Dashboard() {
           type="file"
           id="file-upload"
           className="hidden"
-          accept=".csv"
+          accept=".csv,.pdf"
           onChange={handleFileSelect}
         />
         <Upload className="mx-auto h-12 w-12 text-gray-400" />
         <p className="mt-2 text-sm text-gray-600">
-          Drag and drop your transaction CSV file here, or{' '}
+          Drag and drop your transaction file here, or{' '}
           <button
             type="button"
             className="text-indigo-600 hover:text-indigo-500"
@@ -137,6 +159,21 @@ export function Dashboard() {
             accounts={accounts}
             onClose={handleClose}
             initialFile={selectedFile}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        title="Review PDF Analysis"
+        isOpen={showPDFModal && pdfFile !== null}
+        onClose={() => setShowPDFModal(false)}
+        size="large"
+      >
+        {pdfFile && (
+          <PDFReviewAnalysis
+            pdfFile={pdfFile}
+            onClose={() => setShowPDFModal(false)}
+            onAccept={handlePDFAccept}
           />
         )}
       </Modal>
