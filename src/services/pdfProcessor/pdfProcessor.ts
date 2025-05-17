@@ -1,7 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { WordArray } from 'crypto-js';
-import { sha256 } from 'crypto-js';
-import { Hex } from 'crypto-js/enc-hex';
+import CryptoJS from 'crypto-js';
 
 export class PdfProcessor {
   private userId: string | null = null;
@@ -19,8 +17,8 @@ export class PdfProcessor {
 
       // Calculate file hash to check for duplicates
       const buffer = await file.arrayBuffer();
-      const wordArray = WordArray.create(new Uint8Array(buffer));
-      const hash = sha256(wordArray).toString(Hex);
+      const wordArray = CryptoJS.lib.WordArray.create(new Uint8Array(buffer));
+      const hash = CryptoJS.SHA256(wordArray).toString(CryptoJS.enc.Hex);
 
       // Check if file already exists
       const { data: existingDocs } = await supabase
