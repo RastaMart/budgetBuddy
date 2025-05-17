@@ -1,24 +1,36 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload } from 'lucide-react';
+import { Modal } from './Modal';
+import { CSVImport } from '../transaction/CSVImport';
+import { PDFReviewAnalysis } from '../transaction/PDFReviewAnalysis';
+import { Account } from '../../types/account';
+import { Transaction } from '../../types/transaction';
 
 interface DropZoneProps {
-  onFileAccepted: (file: File) => void;
+  onFileProcessed?: (data: any) => void;
   acceptedFileTypes?: string[];
   maxSize?: number;
   className?: string;
   children?: React.ReactNode;
+  accounts?: Account[];
+  onTransactionsLoaded?: (transactions: Transaction[]) => void;
 }
 
 export function DropZone({
-  onFileAccepted,
+  onFileProcessed,
   acceptedFileTypes = ['.csv', '.pdf'],
   maxSize = 5242880, // 5MB
   className = '',
   children,
+  accounts = [],
+  onTransactionsLoaded = () => {},
 }: DropZoneProps) {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showCSVModal, setShowCSVModal] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -32,13 +44,44 @@ export function DropZone({
 
       if (isAccepted) {
         setError(null);
-        onFileAccepted(file);
+        handleFileProcess(file);
       } else {
         setError(`Only ${acceptedFileTypes.join(', ')} files are supported`);
       }
     },
-    [onFileAccepted, acceptedFileTypes]
+    [acceptedFileTypes]
   );
+
+  const handleFileProcess = (file: File) => {
+    setSelectedFile(file);
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+    if (fileExtension === 'csv') {
+      setShowCSVModal(true);
+    } else if (fileExtension === 'pdf') {
+      setShowPDFModal(true);
+    }
+  };
+
+  const handleClose = () => {
+    setShowCSVModal(false);
+    setShowPDFModal(false);
+    setSelectedFile(null);
+  };
+
+  const handleCSVTransactionsLoaded = (transactions: Transaction[]) => {
+    onTransactionsLoaded(transactions);
+    if (onFileProcessed) {
+      onFileProcessed({ type: 'csv', data: transactions });
+    }
+  };
+
+  const handlePDFAccept = (data: any) => {
+    if (onFileProcessed) {
+      onFileProcessed({ type: 'pdf', data });
+    }
+    handleClose();
+  };
 
   const {
     getRootProps,
@@ -71,35 +114,70 @@ export function DropZone({
   }, [isDragActive]);
 
   return (
-    <div
-      {...getRootProps()}
-      className={`relative border-2 border-dashed rounded-lg p-8 text-center ${
-        isDragging
-          ? 'border-indigo-500 bg-indigo-50'
-          : 'border-gray-300 bg-gray-50'
-      } ${className}`}
-    >
-      <input {...getInputProps()} />
+    <>
+      <div
+        {...getRootProps()}
+        className={`relative border-2 border-dashed rounded-lg p-8 text-center ${
+          isDragging
+            ? 'border-indigo-500 bg-indigo-50'
+            : 'border-gray-300 bg-gray-50'
+        } ${className}`}
+      >
+        <input {...getInputProps()} />
 
-      {children || (
-        <>
-          <Upload className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-sm text-gray-600">
-            Drag and drop your {acceptedFileTypes.join(' or ')} file here, or{' '}
-            <button
-              type="button"
-              className="text-indigo-600 hover:text-indigo-500"
-              onClick={(e) => {
-                e.stopPropagation();
-                openFileDialog();
-              }}
-            >
-              browse
-            </button>
-          </p>
-          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-        </>
-      )}
-    </div>
+        {children || (
+          <>
+            <Upload className="mx-auto h-12 w-12 text-gray-400" />
+            <p className="mt-2 text-sm text-gray-600">
+              Drag and drop your {acceptedFileTypes.join(' or ')} file here, or{' '}
+              <button
+                type="button"
+                className="text-indigo-600 hover:text-indigo-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openFileDialog();
+                }}
+              >
+                browse
+              </button>
+            </p>
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          </>
+        )}
+      </div>
+
+      {/* CSV Import Modal */}
+      <Modal
+        isOpen={showCSVModal}
+        onClose={handleClose}
+        title="Import Transactions"
+        size="full"
+      >
+        {selectedFile && (
+          <CSVImport
+            onTransactionsLoaded={handleCSVTransactionsLoaded}
+            accounts={accounts}
+            onClose={handleClose}
+            initialFile={selectedFile}
+          />
+        )}
+      </Modal>
+
+      {/* PDF Analysis Modal */}
+      <Modal
+        title="Review PDF Analysis"
+        isOpen={showPDFModal && selectedFile !== null}
+        onClose={handleClose}
+        size="large"
+      >
+        {selectedFile && (
+          <PDFReviewAnalysis
+            pdfFile={selectedFile}
+            onClose={handleClose}
+            onAccept={handlePDFAccept}
+          />
+        )}
+      </Modal>
+    </>
   );
 }

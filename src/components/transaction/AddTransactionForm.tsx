@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { CSVImport } from './CSVImport';
 import { Transaction } from '../../types/transaction';
 import { Category } from '../../types/category';
 import { Account } from '../../types/account';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
+import { FileProcessor } from './FileProcessor';
 
 interface FormData {
   category_id?: string;
@@ -369,10 +369,10 @@ export function AddTransactionForm({
 
       {activeTab === 'bulk' && !isEditing && (
         <div className="space-y-6">
-          <CSVImport
+          <FileProcessor
             onTransactionsLoaded={handleBulkImport}
             accounts={accounts}
-            onClose={onClose}
+            acceptedFileTypes={['.csv', '.pdf']}
           />
         </div>
       )}

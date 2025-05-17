@@ -2,21 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useContext';
 import { VERSION } from '../version';
-import { Modal } from '../components/shared/Modal';
-import { CSVImport } from '../components/transaction/CSVImport';
-import { PDFReviewAnalysis } from '../components/transaction/PDFReviewAnalysis';
 import { useAccounts } from '../hooks/useAccounts';
-import { DropZone } from '../components/shared/DropZone';
+import { FileProcessor } from '../components/transaction/FileProcessor';
+import { Transaction } from '../types/transaction';
 
 export function Dashboard() {
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const [categoryCount, setCategoryCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
+    []
+  );
 
   useEffect(() => {
     async function checkSupabaseConnection() {
@@ -37,39 +34,21 @@ export function Dashboard() {
     checkSupabaseConnection();
   }, [user.id]);
 
-  const handleFileUpload = (file: File) => {
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+  const handleTransactionsLoaded = (transactions: Transaction[]) => {
+    // Update recent transactions in state
+    setRecentTransactions((current) => [...transactions, ...current]);
 
-    if (fileExtension === 'csv') {
-      setSelectedFile(file);
-      setShowImportModal(true);
-    } else if (fileExtension === 'pdf') {
-      setPdfFile(file);
-      setShowPDFModal(true);
-    }
-  };
-
-  const handleTransactionsLoaded = () => {
-    // Callback after transactions are loaded
-  };
-
-  const handleClose = () => {
-    setShowImportModal(false);
-    setSelectedFile(null);
-  };
-
-  const handlePDFAccept = () => {
-    console.log('Process PDF file', pdfFile);
-    setShowPDFModal(false);
-    setPdfFile(null);
+    // You could also trigger other actions when transactions are loaded
+    console.log(`${transactions.length} transactions loaded`);
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
 
-      <DropZone
-        onFileAccepted={handleFileUpload}
+      <FileProcessor
+        onTransactionsLoaded={handleTransactionsLoaded}
+        accounts={accounts}
         acceptedFileTypes={['.csv', '.pdf']}
       />
 
@@ -92,36 +71,17 @@ export function Dashboard() {
         )}
       </div>
 
-      <Modal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        title="Import Transactions"
-        size="full"
-      >
-        {selectedFile && (
-          <CSVImport
-            onTransactionsLoaded={handleTransactionsLoaded}
-            accounts={accounts}
-            onClose={handleClose}
-            initialFile={selectedFile}
-          />
-        )}
-      </Modal>
-
-      <Modal
-        title="Review PDF Analysis"
-        isOpen={showPDFModal && pdfFile !== null}
-        onClose={() => setShowPDFModal(false)}
-        size="large"
-      >
-        {pdfFile && (
-          <PDFReviewAnalysis
-            pdfFile={pdfFile}
-            onClose={() => setShowPDFModal(false)}
-            onAccept={handlePDFAccept}
-          />
-        )}
-      </Modal>
+      {recentTransactions.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">
+            Recently Imported Transactions
+          </h2>
+          <p className="text-gray-600">
+            {recentTransactions.length} transaction
+            {recentTransactions.length !== 1 ? 's' : ''} imported
+          </p>
+        </div>
+      )}
     </div>
   );
 }
