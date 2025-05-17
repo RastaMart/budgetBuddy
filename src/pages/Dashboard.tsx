@@ -2,18 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useContext';
 import { VERSION } from '../version';
-import { Upload } from 'lucide-react';
 import { Modal } from '../components/shared/Modal';
 import { CSVImport } from '../components/transaction/CSVImport';
 import { PDFReviewAnalysis } from '../components/transaction/PDFReviewAnalysis';
 import { useAccounts } from '../hooks/useAccounts';
+import { DropZone } from '../components/shared/DropZone';
 
 export function Dashboard() {
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const [categoryCount, setCategoryCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -38,33 +37,6 @@ export function Dashboard() {
     checkSupabaseConnection();
   }, [user.id]);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    console.log('handleDrop', handleDrop);
-    e.preventDefault();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      handleFileUpload(file);
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
-    }
-  };
-
   const handleFileUpload = (file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
@@ -72,15 +44,13 @@ export function Dashboard() {
       setSelectedFile(file);
       setShowImportModal(true);
     } else if (fileExtension === 'pdf') {
-      console.log('fileExtension === pdf', file);
       setPdfFile(file);
       setShowPDFModal(true);
     }
   };
 
   const handleTransactionsLoaded = () => {
-    // setShowImportModal(false);
-    // setSelectedFile(null);
+    // Callback after transactions are loaded
   };
 
   const handleClose = () => {
@@ -98,35 +68,10 @@ export function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
 
-      <div
-        className={`relative border-2 border-dashed rounded-lg p-8 text-center ${
-          isDragging
-            ? 'border-indigo-500 bg-indigo-50'
-            : 'border-gray-300 bg-gray-50'
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <input
-          type="file"
-          id="file-upload"
-          className="hidden"
-          accept=".csv,.pdf"
-          onChange={handleFileSelect}
-        />
-        <Upload className="mx-auto h-12 w-12 text-gray-400" />
-        <p className="mt-2 text-sm text-gray-600">
-          Drag and drop your transaction file here, or{' '}
-          <button
-            type="button"
-            className="text-indigo-600 hover:text-indigo-500"
-            onClick={() => document.getElementById('file-upload')?.click()}
-          >
-            browse
-          </button>
-        </p>
-      </div>
+      <DropZone
+        onFileAccepted={handleFileUpload}
+        acceptedFileTypes={['.csv', '.pdf']}
+      />
 
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">
