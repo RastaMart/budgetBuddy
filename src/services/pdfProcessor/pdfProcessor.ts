@@ -1,3 +1,8 @@
+import { supabase } from '../../lib/supabase';
+import { WordArray } from 'crypto-js';
+import { sha256 } from 'crypto-js';
+import { Hex } from 'crypto-js/enc-hex';
+
 export class PdfProcessor {
   private userId: string | null = null;
 
