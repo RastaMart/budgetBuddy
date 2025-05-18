@@ -114,6 +114,105 @@ export async function uploadCSVFile(
   }
 }
 
+export async function uploadPDFFile(
+  file: File,
+  userId: string
+): Promise<UploadedDocument | null> {
+  try {
+    // Calculate file hash
+    const buffer = await file.arrayBuffer();
+    const wordArray = WordArray.create(new Uint8Array(buffer));
+    const hash = sha256(wordArray).toString(Hex);
+
+    // Check if file already exists
+    const { data: existingDocs } = await supabase
+      .from('user_documents')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('file_hash', hash)
+      .limit(1);
+
+    // If we found an existing document, return it
+    if (existingDocs && existingDocs.length > 0) {
+      return existingDocs[0];
+    }
+
+    // Upload file to storage
+    const filePath = `${userId}/${hash}-${file.name}`;
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('pdf-uploads')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error('PDF upload error details:', {
+          message: uploadError.message,
+          status: uploadError.status,
+          details: uploadError.details,
+          hint: uploadError.hint,
+          code: uploadError.code,
+        });
+
+        if (
+          uploadError.message.includes('bucket') &&
+          uploadError.message.includes('not found')
+        ) {
+          console.error(
+            'The pdf-uploads bucket does not exist. An admin needs to create it.'
+          );
+        }
+        throw uploadError;
+      }
+    } catch (storageError) {
+      console.error('Storage operation failed:', storageError);
+      throw storageError;
+    }
+
+    // Create document record
+    try {
+      const { data: document, error: docError } = await supabase
+        .from('user_documents')
+        .insert({
+          user_id: userId,
+          file_name: file.name,
+          file_hash: hash,
+          file_path: filePath,
+          metadata: {
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified,
+          },
+        })
+        .select()
+        .single();
+
+      if (docError) {
+        console.error('Document creation error details:', {
+          message: docError.message,
+          details: docError.details,
+          hint: docError.hint,
+          code: docError.code,
+        });
+        throw docError;
+      }
+      return document;
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      throw dbError;
+    }
+  } catch (error) {
+    console.error('Error uploading PDF file:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    return null;
+  }
+}
+
 export async function getFileContent(filePath: string): Promise<string | null> {
   try {
     const { data, error } = await supabase.storage

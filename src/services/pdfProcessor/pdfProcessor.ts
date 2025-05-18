@@ -1,3 +1,6 @@
+import { createClient } from "npm:@supabase/supabase-js@2.39.7";
+import { uploadPDFFile } from '../storageService';
+
 export class PdfProcessor {
   private userId: string | null = null;
 
@@ -12,58 +15,9 @@ export class PdfProcessor {
         throw new Error('User ID is required');
       }
 
-      // Calculate file hash to check for duplicates
-      const buffer = await file.arrayBuffer();
-      const wordArray = WordArray.create(new Uint8Array(buffer));
-      const hash = sha256(wordArray).toString(Hex);
-
-      // Check if file already exists
-      const { data: existingDocs } = await supabase
-        .from('user_documents')
-        .select('*')
-        .eq('user_id', this.userId)
-        .eq('file_hash', hash)
-        .limit(1);
-
-      // If we found an existing document, return its path
-      if (existingDocs && existingDocs.length > 0) {
-        return existingDocs[0].file_path;
-      }
-
-      // Upload file to storage
-      const filePath = `${this.userId}/${hash}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('pdf-uploads')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error('PDF upload error:', uploadError);
-        throw uploadError;
-      }
-
-      // Create document record
-      const { data: document, error: docError } = await supabase
-        .from('user_documents')
-        .insert({
-          user_id: this.userId,
-          file_name: file.name,
-          file_hash: hash,
-          file_path: filePath,
-          metadata: {
-            size: file.size,
-            type: file.type,
-            lastModified: file.lastModified,
-          },
-        })
-        .select()
-        .single();
-
-      if (docError) {
-        console.error('Document record creation error:', docError);
-        throw docError;
+      const document = await uploadPDFFile(file, this.userId);
+      if (!document) {
+        throw new Error('Failed to upload PDF');
       }
 
       return document.file_path;
@@ -75,8 +29,19 @@ export class PdfProcessor {
 
   async processPDF(filePath: string) {
     try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
+
       // Download the PDF from storage
-      const { data, error } = await supabase.storage
+      const { data, error } = await supabaseClient.storage
         .from('pdf-uploads')
         .download(filePath);
 
