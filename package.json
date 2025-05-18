@@ -11,9 +11,9 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md}\"",
     "type-check": "tsc --noEmit",
-    "bump:patch": "node scripts/bump-version.js patch",
-    "bump:minor": "node scripts/bump-version.js minor",
-    "bump:major": "node scripts/bump-version.js major",
+    "bump:patch": "node scripts/bump-version.ts patch",
+    "bump:minor": "node scripts/bump-version.ts minor",
+    "bump:major": "node scripts/bump-version.ts major",
     "createSeed": "supabase db dump -x cron.job,storage.buckets -f supabase/seed.sql --data-only"
   },
   "dependencies": {
@@ -37,13 +37,15 @@
     "recharts": "^2.12.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.25.1",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.27.0",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.4.1",
+    "@welldone-software/why-did-you-render": "^8.0.3",
     "autoprefixer": "^10.4.18",
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",

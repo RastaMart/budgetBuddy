@@ -1,16 +1,15 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
-import { AuthGuard } from "./components/auth/AuthGuard";
-import { Layout } from "./components/Layout";
-import { Dashboard } from "./pages/Dashboard";
-import { Budgets } from "./pages/Budgets";
-import { Transactions } from "./pages/Transactions";
-import { Settings } from "./pages/Settings";
-import { Accounts } from "./pages/Accounts";
-import { Login } from "./pages/auth/Login";
-import { SignUp } from "./pages/auth/SignUp";
-import { Callback } from "./pages/auth/Callback";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { AuthGuard } from './components/auth/AuthGuard';
+import { Layout } from './components/Layout';
+import { Dashboard } from './pages/Dashboard';
+import { Budgets } from './pages/Budgets';
+import { Transactions } from './pages/Transactions';
+import { Settings } from './pages/Settings';
+import { Accounts } from './pages/Accounts';
+import { Login } from './pages/auth/Login';
+import { SignUp } from './pages/auth/SignUp';
+import { Callback } from './pages/auth/Callback';
 
 function App() {
   return (

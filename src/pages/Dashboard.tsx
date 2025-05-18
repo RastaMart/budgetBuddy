@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useContext';
-import { VERSION } from '../version';
 import { useAccounts } from '../hooks/useAccounts';
 import { FileProcessor } from '../components/transaction/FileProcessor';
 import { Transaction } from '../types/transaction';
 
 export function Dashboard() {
+  console.log('Dashboard');
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const [categoryCount, setCategoryCount] = useState<number | null>(null);
@@ -14,9 +14,13 @@ export function Dashboard() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
     []
   );
-
+  if (!user) {
+    return <div>Please log in to view your dashboard.</div>;
+  }
   useEffect(() => {
     async function checkSupabaseConnection() {
+      if (!user) return;
+
       try {
         const { count, error } = await supabase
           .from('categories')
@@ -32,7 +36,7 @@ export function Dashboard() {
     }
 
     checkSupabaseConnection();
-  }, [user.id]);
+  }, [user]);
 
   const handleTransactionsLoaded = (transactions: Transaction[]) => {
     // Update recent transactions in state
@@ -66,7 +70,6 @@ export function Dashboard() {
               {categoryCount === 1 ? 'category' : 'categories'} in your account.
             </p>
             <p className="text-gray-600">User ID: {user.id}</p>
-            <p className="text-xs text-gray-400 mt-2">v{VERSION}</p>
           </div>
         )}
       </div>

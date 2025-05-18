@@ -27,14 +27,14 @@ jobs:
 
       - name: Bump version
         if: github.ref == github.ref == 'refs/heads/staging'
-        run: node scripts/bump-version.js patch
+        run: node scripts/bump-version.ts patch
 
       - name: Commit changes
         if: github.ref == github.ref == 'refs/heads/staging'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add package.json src/version.js
+          git add package.json src/version.ts
           git commit -m "Bump version number"
 
       - name: Push changes

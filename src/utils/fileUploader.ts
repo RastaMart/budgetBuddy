@@ -2,7 +2,7 @@
  * Uploads a file to the server
  */
 export async function uploadFile(file: File): Promise<string> {
-  console.lopg('uploadFile', file.name);
+  console.log('uploadFile', file.name);
   // This is a placeholder for actual file upload functionality
   // In a real app, you would upload to your backend or cloud storage
 

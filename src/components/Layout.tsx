@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useContext';
 import { Avatar } from './ui/Avatar';
-import { VERSION } from '../version.js';
+import { VERSION } from '../version';
 
 export function Layout() {
   const { signOut, profile } = useAuth();

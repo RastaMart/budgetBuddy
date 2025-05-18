@@ -16,6 +16,7 @@ export function FileProcessor({
   acceptedFileTypes = ['.csv', '.pdf'],
   className = '',
 }: FileProcessorProps) {
+  console.log('FileProcessor');
   const handleFileProcessed = (result: any) => {
     if (result.type === 'csv') {
       onTransactionsLoaded(result.data);

@@ -179,6 +179,17 @@ export async function uploadPDFFile(
 
     // Create document record
     try {
+      console.log({
+        userId,
+        file_name: file.name,
+        file_hash: hash,
+        file_path: filePath,
+        metadata: {
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified,
+        },
+      });
       const { data: document, error: docError } = await supabase
         .from('user_documents')
         .insert({
