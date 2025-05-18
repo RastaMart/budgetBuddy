@@ -27,11 +27,18 @@ export function PDFReviewAnalysis({
         pdfProcessor.init(user.id);
 
         const filePath = await pdfProcessor.uploadFile(pdfFile);
-        if (!filePath) throw new Error('Failed to upload PDF');
+        if (!filePath) {
+          // Check if error is due to duplicate file
+          if (error?.includes('duplicate key value')) {
+            throw new Error('This PDF has already been processed');
+          }
+          throw new Error('Failed to upload PDF');
+        }
 
         const result = await pdfProcessor.processPDF(filePath);
-        if (!result.success)
+        if (!result.success) {
           throw new Error(result.errorMessage || 'Failed to process PDF');
+        }
 
         setAnalysisResult(result.data);
       } catch (err) {
@@ -47,7 +54,7 @@ export function PDFReviewAnalysis({
     };
 
     processPDF();
-  }, [pdfFile, user]);
+  }, [pdfFile, user, error]);
 
   return (
     <div className="space-y-4">
@@ -63,6 +70,11 @@ export function PDFReviewAnalysis({
       {error && (
         <div className="bg-red-50 p-4 rounded-md border border-red-200">
           <p className="text-red-600">{error}</p>
+          {error.includes('already been processed') && (
+            <p className="mt-2 text-sm text-red-500">
+              Please select a different PDF file or check your uploaded documents.
+            </p>
+          )}
         </div>
       )}
 

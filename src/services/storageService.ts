@@ -124,20 +124,26 @@ export async function uploadPDFFile(
     const wordArray = WordArray.create(new Uint8Array(buffer));
     const hash = sha256(wordArray).toString(Hex);
 
-    // Check if file already exists
-    const { data: existingDocs } = await supabase
+    // Check if file already exists - using single() for exact match
+    const { data: existingDoc, error: queryError } = await supabase
       .from('user_documents')
       .select('*')
       .eq('user_id', userId)
       .eq('file_hash', hash)
-      .limit(1);
+      .maybeSingle();
 
-    // If we found an existing document, return it
-    if (existingDocs && existingDocs.length > 0) {
-      return existingDocs[0];
+    if (queryError) {
+      console.error('Error checking for existing document:', queryError);
+      throw queryError;
     }
 
-    // Upload file to storage
+    // If we found an existing document, return it immediately
+    if (existingDoc) {
+      console.log('Found existing document, returning:', existingDoc);
+      return existingDoc;
+    }
+
+    // Upload file to storage only if it doesn't exist
     const filePath = `${userId}/${hash}-${file.name}`;
     try {
       const { error: uploadError } = await supabase.storage
