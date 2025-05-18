@@ -1,5 +1,3 @@
-import { CSVRow } from '../types/csv';
-
 export function parseCSVLine(line: string): string[] {
   const fields: string[] = [];
   let field = '';

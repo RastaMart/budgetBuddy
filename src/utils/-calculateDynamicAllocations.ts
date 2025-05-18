@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 
 interface Allocation {
   id: string;
+  name: string;
   category_id: string;
   allocation_type: 'manual' | 'dynamic';
   percentage?: number;
@@ -51,7 +52,7 @@ export async function calculateDynamicAllocations(
           .single();
 
         if (refCategory) {
-          name = `${refCategory.budget.name} - ${refCategory.name}`;
+          name = `${refCategory.budget?.[0]?.name || 'Unknown'} - ${refCategory.name}`;
 
           // Get reference category transactions
           const { data: refTransactions } = await supabase

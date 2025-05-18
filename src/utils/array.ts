@@ -21,7 +21,7 @@ export const mostFrequentValueOfArray = (array: any[]): any => {
   }
 
   // Count occurrences of each value
-  const occurrences = {};
+  const occurrences: Record<string | number, number> = {};
   for (const item of array) {
     occurrences[item] = (occurrences[item] || 0) + 1;
   }

@@ -15,7 +15,7 @@ const DATE_FORMATS = [
 export function parseDate(dateStr: string): string | null {
   // Remove any surrounding quotes and trim whitespace
   dateStr = dateStr.replace(/^["']|["']$/g, '').trim();
-  
+
   // Try each format until we find one that works
   for (const dateFormat of DATE_FORMATS) {
     const parsedDate = parse(dateStr, dateFormat, new Date());
