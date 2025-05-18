@@ -2,16 +2,22 @@ import { parse } from 'papaparse';
 import { formatCache } from './formatCache';
 import { nanoid } from 'nanoid';
 import CryptoJS from 'crypto-js';
-import sha256 from 'crypto-js/sha256';
-import Hex from 'crypto-js/enc-hex';
-import WordArray from 'crypto-js/lib-typedarrays';
-import { ColumnMapping, CsvProcessResult } from '../../types/columnMapping';
-import { RawTransaction } from '../../types/transaction';
 import { getFileContent, uploadCSVFile } from '../storageService';
 import { csvMapper } from './csvMapper';
+import { RawTransaction } from '../../types/transaction';
+import { ColumnMapping } from '../../types/columnMapping';
+
+export interface CsvProcessResult {
+  success: boolean;
+  rawTransactions?: RawTransaction[];
+  formatSignature?: string;
+  mapping?: ColumnMapping;
+  confidence: number;
+  mappedFrom?: 'Cache' | 'Heuristic' | 'User';
+  errorMessage?: string;
+}
 
 export class CsvProcessor {
-  csvContent?: string;
   userId?: string;
 
   init(userId: string) {
@@ -31,11 +37,10 @@ export class CsvProcessor {
       }
 
       // Get file content from storage
-      const content = await getFileContent(document.file_path);
+      const content = await getFileContent('csv', document.file_path);
       if (!content) {
         throw new Error('Failed to read file content');
       }
-      this.csvContent = content;
       return content;
     } catch (error) {
       console.error('File upload error:', error);
@@ -43,9 +48,7 @@ export class CsvProcessor {
     }
   }
 
-  async processCSV(
-    csvContent: string // userId: string
-  ): Promise<CsvProcessResult> {
+  async processCSV(csvContent: string): Promise<CsvProcessResult> {
     try {
       // 1. Generate a format signature for this CSV
       const formatSignature = this.generateFormatSignature(csvContent);

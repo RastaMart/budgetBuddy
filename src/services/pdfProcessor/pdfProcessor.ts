@@ -1,5 +1,14 @@
-import { createClient } from "npm:@supabase/supabase-js@2.39.7";
-import { uploadPDFFile } from '../storageService';
+import { getFileContent, uploadPDFFile } from '../storageService';
+
+export interface PdfProcessResult {
+  success: boolean;
+  // rawTransactions?: RawTransaction[];
+  formatSignature?: string;
+  // mapping?: ColumnMapping;
+  confidence: number;
+  mappedFrom?: 'Cache' | 'Heuristic' | 'User';
+  errorMessage?: string;
+}
 
 export class PdfProcessor {
   private userId: string | null = null;
@@ -10,59 +19,45 @@ export class PdfProcessor {
   }
 
   async uploadFile(file: File): Promise<string | null> {
+    if (!this.userId) {
+      console.error('File or user ID is not set');
+      return null;
+    }
     try {
-      if (!this.userId) {
-        throw new Error('User ID is required');
-      }
-
+      // Upload file to storage
       const document = await uploadPDFFile(file, this.userId);
       if (!document) {
-        throw new Error('Failed to upload PDF');
+        throw new Error('Failed to upload file');
       }
 
-      return document.file_path;
+      // Get file content from storage
+      const content = await getFileContent('pdf', document.file_path);
+      if (!content) {
+        throw new Error('Failed to read file content');
+      }
+      return content;
     } catch (error) {
-      console.error('Error uploading PDF file:', error);
+      console.error('File upload error:', error);
       return null;
     }
   }
 
-  async processPDF(filePath: string) {
+  async processPDF(pdfContent: string): Promise<PdfProcessResult> {
     try {
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-          },
-        }
-      );
-
-      // Download the PDF from storage
-      const { data, error } = await supabaseClient.storage
-        .from('pdf-uploads')
-        .download(filePath);
-
-      if (error) {
-        throw error;
-      }
-
-      // Here you would process the PDF content
-      // This is a placeholder that would be replaced with actual PDF processing
+      // TODO: Implement PDF processing logic
       return {
         success: true,
-        data: {
-          text: 'Extracted text would appear here',
-          tables: [],
-        },
+        confidence: 0,
       };
     } catch (error) {
       console.error('Error processing PDF:', error);
       return {
         success: false,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error processing PDF',
+        confidence: 0,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error processing PDF',
       };
     }
   }

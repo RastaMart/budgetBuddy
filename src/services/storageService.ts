@@ -213,10 +213,13 @@ export async function uploadPDFFile(
   }
 }
 
-export async function getFileContent(filePath: string): Promise<string | null> {
+export async function getFileContent(
+  type: 'csv' | 'pdf',
+  filePath: string
+): Promise<string | null> {
   try {
     const { data, error } = await supabase.storage
-      .from('csv-uploads')
+      .from(type + '-uploads')
       .download(filePath);
 
     if (error) throw error;
