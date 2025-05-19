@@ -1,6 +1,8 @@
-import { useContext } from "react";
-import { AuthContext } from "../contexts/AuthContext";
+import { useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 
-export function useAuth() {
+function useAuth() {
   return useContext(AuthContext);
 }
+useAuth.whyDidYouRender = true;
+export { useAuth };

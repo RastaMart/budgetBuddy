@@ -1,12 +1,10 @@
-import React from 'react';
 import { format, parseISO } from 'date-fns';
 import { Amount } from '../shared/Amount';
 import { CSVTransaction } from '../../types/csv';
-import { Account } from '../../types/account';
+import { useAccounts } from '../../hooks/useAccounts';
 
 interface CSVReviewTransactionsProps {
   parsedTransactions: CSVTransaction[];
-  accounts: Account[];
   selectedAccount: string;
   onSelectAccount: (accountId: string) => void;
   onToggleTransaction: (index: number) => void;
@@ -17,7 +15,6 @@ interface CSVReviewTransactionsProps {
 
 export function CSVReviewTransactions({
   parsedTransactions,
-  accounts,
   selectedAccount,
   onSelectAccount,
   onToggleTransaction,
@@ -25,6 +22,7 @@ export function CSVReviewTransactions({
   onImport,
   onCancel,
 }: CSVReviewTransactionsProps) {
+  const { accounts } = useAccounts();
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg shadow">

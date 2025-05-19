@@ -1,22 +1,18 @@
 import React from 'react';
 import { DropZone } from '../shared/DropZone';
 import { Transaction } from '../../types/transaction';
-import { Account } from '../../types/account';
 
 interface FileProcessorProps {
-  onTransactionsLoaded: (transactions: Transaction[]) => void;
-  accounts: Account[];
-  acceptedFileTypes?: string[];
+  onTransactionsLoaded?: (transactions: Transaction[]) => void;
   className?: string;
 }
 
-export function FileProcessor({
-  onTransactionsLoaded,
-  accounts,
-  acceptedFileTypes = ['.csv', '.pdf'],
+function FileProcessor({
+  onTransactionsLoaded = () => {},
   className = '',
 }: FileProcessorProps) {
-  console.log('FileProcessor');
+  const acceptedFileTypes = ['csv', 'pdf'];
+
   const handleFileProcessed = (result: any) => {
     if (result.type === 'csv') {
       onTransactionsLoaded(result.data);
@@ -36,9 +32,10 @@ export function FileProcessor({
     <DropZone
       onFileProcessed={handleFileProcessed}
       acceptedFileTypes={acceptedFileTypes}
-      accounts={accounts}
       onTransactionsLoaded={onTransactionsLoaded}
       className={className}
     />
   );
 }
+FileProcessor.whyDidYouRender = true;
+export { FileProcessor };

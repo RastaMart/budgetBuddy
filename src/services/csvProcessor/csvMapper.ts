@@ -1,17 +1,12 @@
 import { parse } from 'papaparse';
-import { formatCache } from './formatCache';
-import { nanoid } from 'nanoid';
-import CryptoJS from 'crypto-js';
-import sha256 from 'crypto-js/sha256';
-import Hex from 'crypto-js/enc-hex';
-import WordArray from 'crypto-js/lib-typedarrays';
-import { ColumnMapping, CsvProcessResult } from '../../types/columnMapping';
+import { ColumnMapping } from '../../types/columnMapping';
 import { RawTransaction } from '../../types/transaction';
 import {
   mostFrequentValueOfArray,
   valueAretheSameMoreThan,
 } from '../../utils/array';
 import Decimal from 'decimal.js';
+import { CsvProcessResult } from './csvProcessor';
 
 const globalSampleSize = 10;
 
@@ -1460,18 +1455,31 @@ export class CsvMapper {
     csvContent: string,
     mapping: ColumnMapping
   ): CsvProcessResult {
-    const { data } = parse(csvContent, {
-      header: true,
-      skipEmptyLines: true,
-    });
+    try {
+      const { data } = parse(csvContent, {
+        header: true,
+        skipEmptyLines: true,
+      });
 
-    const transactions = this.mapDataToTransactions(data, mapping);
-
-    return {
-      success: true,
-      transactions,
-      confidence: this.calculateMappingConfidence(mapping),
-    };
+      const transactions = this.mapDataToTransactions(data, mapping);
+      console.log('processCsvWithMapping transactions', transactions);
+      return {
+        success: true,
+        rawTransactions: transactions,
+        mapping,
+        confidence: 1,
+        mappedFrom: 'Cache',
+      };
+    } catch (error) {
+      console.error('Error processing CSV with mapping:', error);
+      return {
+        success: false,
+        mapping,
+        confidence: 0,
+        mappedFrom: 'Cache',
+        errorMessage: 'Failed to process CSV with provided mapping.',
+      };
+    }
   }
 }
 

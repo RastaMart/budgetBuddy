@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CSVDropzone } from './CSVDropzone';
 import { CSVPreview, CSVTransaction, ImportError } from '../../types/csv';
 import { Account } from '../../types/account';
-import { Transaction, RawTransactions } from '../../types/transaction';
+import { Transaction, RawTransaction } from '../../types/transaction';
 import {
   parseDate,
   cleanAmount,
@@ -17,25 +17,23 @@ import { CSVDescriptionColumnSelector } from './CSVDescriptionColumnSelector';
 import { CSVAmountTypeSelector } from './CSVAmountTypeSelector';
 import { CSVAmountColumnSelector } from './CSVAmountColumnSelector';
 import { CSVSplitAmountColumnSelector } from './CSVSplitAmountColumnSelector';
-import { CSVReviewMapping } from './CSVReviewMapping';
+import { CSVReviewMapping } from '../fileProcessing/CSVReviewMapping';
 import { CSVReviewTransactions } from './CSVReviewTransactions';
 import { CSVImporting } from './CSVImporting';
 import { CSVImportComplete } from './CSVImportComplete';
-import { readCSVFile } from '../../utils/csvParser';
+import { CSVFormatedData, readCSVFile } from '../../utils/csvParser';
 import { ColumnMapping } from '../../types/columnMapping';
 
 interface CSVImportProps {
   onTransactionsLoaded: (transactions: Transaction[]) => void;
-  accounts: Account[];
   onClose?: () => void;
-  initialFile?: File;
+  file: File;
 }
 
 export function CSVImport({
   onTransactionsLoaded,
-  accounts,
   onClose,
-  initialFile,
+  file,
 }: CSVImportProps) {
   const csvProcessor = new CsvProcessor();
   const { user } = useAuth();
@@ -45,7 +43,7 @@ export function CSVImport({
   const [error, setError] = useState<string | null>(null);
   const [csvPreview, setCsvPreview] = useState<CSVPreview | null>(null);
   const [rawContent, setRawContent] = useState<string>('');
-  const [rawTransactions, setRawTransactions] = useState<RawTransactions[]>([]);
+  const [rawTransactions, setRawTransactions] = useState<RawTransaction[]>([]);
   const [mappingStep, setMappingStep] = useState<
     | 'initial'
     | 'processing'
@@ -58,8 +56,10 @@ export function CSVImport({
     | 'reviewTransaction'
     | 'importing'
     | 'complete'
+    | 'error'
   >('initial');
   const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>({});
+  const [formatSignature, setFormatSignature] = useState<string | null>(null);
 
   const [isSingleAmountColumn, setIsSingleAmountColumn] = useState<
     boolean | null
@@ -79,16 +79,16 @@ export function CSVImport({
     file_path: string;
   } | null>(null);
 
+  csvProcessor.init(user.id);
+
   useEffect(() => {
-    if (initialFile) {
-      handleFileSelect(initialFile);
+    if (file) {
+      processFile(file);
     }
-  }, [initialFile]);
+  }, [file]);
 
-  const handleFileSelect = async (file: File) => {
+  const processFile = async (file: File) => {
     try {
-      csvProcessor.init(user.id);
-
       setMappingStep('processing');
       setError(null);
 
@@ -102,21 +102,39 @@ export function CSVImport({
         success,
         rawTransactions: newRawTransactions,
         mapping,
+        formatSignature: newFormatSignature,
         confidence,
         errorMessage,
       } = await csvProcessor.processCSV(content);
-
+      console.log({
+        success,
+        newRawTransactions,
+        mapping,
+        newFormatSignature,
+        confidence,
+        errorMessage,
+      });
       if (!success && errorMessage) {
         throw new Error(errorMessage);
       }
+      if (newFormatSignature) {
+        setFormatSignature(newFormatSignature);
+      }
 
-      const { headers, rows } = await readCSVFile(content);
+      const { headers, rows, hasHeaders } = await readCSVFile(content);
+      console.log('do setCsvPreview', headers, rows);
       setCsvPreview({ headers, rows });
 
-      if (success && confidence > 0.5 && mapping != null) {
-        setColumnMapping(mapping);
+      if (success && confidence > 0.95 && mapping != null) {
+        // setColumnMapping(mapping); // Done in handleAcceptMapping
         if (newRawTransactions) {
-          setRawTransactions(newRawTransactions);
+          await setRawTransactions(newRawTransactions);
+        }
+        await handleAcceptMapping(mapping, { headers, rows, hasHeaders });
+      } else if (success && confidence > 0.3 && mapping != null) {
+        await setColumnMapping(mapping);
+        if (newRawTransactions) {
+          await setRawTransactions(newRawTransactions);
         }
         setMappingStep('reviewMapping');
       } else {
@@ -134,6 +152,9 @@ export function CSVImport({
   };
 
   const handleRefuseMapping = () => {
+    if (formatSignature) {
+      csvProcessor.handleMappingRefuse(formatSignature);
+    }
     setColumnMapping({
       date: undefined,
       description: undefined,
@@ -143,9 +164,14 @@ export function CSVImport({
     });
     setMappingStep('date');
   };
-  const handleAcceptMapping = (newMapping: ColumnMapping) => {
+  const handleAcceptMapping = async (
+    newMapping: ColumnMapping,
+    csvData?: CSVFormatedData
+  ) => {
+    console.log('handleAcceptMapping', formatSignature, newMapping, csvData);
+    console.log('set newMapping', newMapping);
     setColumnMapping(newMapping);
-    processTransactions(newMapping);
+    await processTransactions(newMapping, csvData);
   };
 
   const handleColumnSelect = async (columnIndex: number) => {
@@ -180,15 +206,26 @@ export function CSVImport({
     }
   };
 
-  const processTransactions = async (mapping: typeof columnMapping) => {
-    if (!csvPreview) return;
+  const processTransactions = async (
+    mapping: typeof columnMapping,
+    csvData?: CSVFormatedData
+  ) => {
+    if (formatSignature && mapping) {
+      console.log('do handleMappingAccepted', formatSignature, mapping);
+      csvProcessor.handleMappingAccepted(formatSignature, mapping);
+    }
+
+    console.log('processTransactions', mapping, csvPreview);
+    if (!csvPreview && !csvData) return;
 
     const { transactions } = await validateAndParseData(
-      csvPreview.rows,
+      (csvPreview || csvData)?.rows || [],
       mapping
     );
     const transactionsWithDuplicates = await checkForDuplicates(transactions);
+    console.log('do setParsedTransactions', transactionsWithDuplicates);
     setParsedTransactions(transactionsWithDuplicates);
+
     setMappingStep('reviewTransaction');
   };
 
@@ -228,6 +265,9 @@ export function CSVImport({
     transactions: CSVTransaction[];
     invalidRows: Array<{ row: number; errors: string[] }>;
   }> => {
+    if (!mapping) {
+      throw new Error('Mapping is not defined');
+    }
     const results = {
       transactions: [] as CSVTransaction[],
       invalidRows: [] as Array<{ row: number; errors: string[] }>,
@@ -363,7 +403,7 @@ export function CSVImport({
   };
 
   const renderMappingStep = () => {
-    if (!csvPreview) return null;
+    if (!csvPreview || !columnMapping) return null;
 
     switch (mappingStep) {
       case 'date':
@@ -408,7 +448,6 @@ export function CSVImport({
         return (
           <CSVReviewTransactions
             parsedTransactions={parsedTransactions}
-            accounts={accounts}
             selectedAccount={selectedAccount}
             onSelectAccount={setSelectedAccount}
             onToggleTransaction={toggleTransactionSelection}
@@ -428,7 +467,12 @@ export function CSVImport({
   return (
     <div className="space-y-4">
       {mappingStep === 'initial' && (
-        <CSVDropzone onFileSelect={handleFileSelect} error={error} />
+        // <CSVDropzone onFileSelect={handleFileSelect} error={error} />
+        <p>Initialising...</p>
+      )}
+      {mappingStep === 'error' && (
+        // <CSVDropzone onFileSelect={handleFileSelect} error={error} />
+        <p>error</p>
       )}
       {mappingStep === 'processing' && <CSVProcessing />}
       {mappingStep === 'reviewMapping' && (

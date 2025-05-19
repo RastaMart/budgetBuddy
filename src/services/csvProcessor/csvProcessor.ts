@@ -48,22 +48,51 @@ export class CsvProcessor {
     }
   }
 
+  async handleMappingRefuse(formatSignature: string) {
+    if (!this.userId) {
+      console.error('File or user ID is not set');
+      return;
+    }
+    await formatCache.deleteFormat(formatSignature);
+  }
+  async handleMappingAccepted(formatSignature: string, mapping: ColumnMapping) {
+    if (!this.userId) {
+      console.error('File or user ID is not set');
+      return;
+    }
+    await formatCache.saveFormat(formatSignature, mapping, this.userId);
+  }
+
   async processCSV(csvContent: string): Promise<CsvProcessResult> {
+    if (!this.userId) {
+      console.error('File or user ID is not set');
+      return {
+        success: false,
+        confidence: 0,
+        errorMessage: 'userId is not set',
+      };
+    }
     try {
       // 1. Generate a format signature for this CSV
+      console.log('1. Generate a format signature for this CSV');
       const formatSignature = this.generateFormatSignature(csvContent);
+
       // 2. Check cache for known format
+      console.log('2. Check cache for known format');
       const cachedMapping = await formatCache.getFormat(formatSignature);
 
       if (cachedMapping) {
         // Use the cached mapping if available
+        console.log('Use the cached mapping');
         return {
+          formatSignature,
           ...csvMapper.processCsvWithMapping(csvContent, cachedMapping),
-          mappedFrom: 'Cache',
         };
       }
 
       // 3. If no cached mapping, detect columns using heuristics
+      console.log('3. If no cached mapping, detect columns using heuristics');
+
       const { data } = parse(csvContent, {
         //header: true,
         skipEmptyLines: true,
@@ -81,12 +110,8 @@ export class CsvProcessor {
       const confidence = csvMapper.calculateMappingConfidence(mapping);
 
       // 4. Process the data with the detected mapping
+      console.log('4. Process the data with the detected mapping');
       const rawTransactions = csvMapper.mapDataToTransactions(data, mapping);
-
-      // 5. Cache the mapping if confidence is high enough
-      //   if (confidence > 0.8) {
-      //     await formatCache.saveFormat(formatSignature, mapping, userId);
-      //   }
 
       return {
         success: true,
@@ -119,11 +144,18 @@ export class CsvProcessor {
     const headerSignature = meta.fields?.join('|') || '';
     const structureSignature =
       data.length > 0 ? Object.values(data[0]).join('|') : '';
-
+    console.log(
+      'generateFormatSignature',
+      'headerSignature',
+      headerSignature,
+      'structureSignature',
+      structureSignature
+    );
     // Calculate file hash
     const hash = CryptoJS.SHA256(headerSignature + structureSignature);
-
-    return nanoid(10) + '-' + hash.toString(CryptoJS.enc.Hex).substring(0, 20);
+    const signature = hash.toString(CryptoJS.enc.Hex).substring(0, 20);
+    console.log('generateFormatSignature', 'signature', signature);
+    return signature;
   }
 }
 

@@ -8,53 +8,57 @@ interface PDFReviewAnalysisProps {
   onAccept: () => void;
 }
 
-export function PDFReviewAnalysis({
+function PDFReviewAnalysis({
   pdfFile,
   onClose,
   onAccept,
 }: PDFReviewAnalysisProps) {
+  console.log('PDFReviewAnalysis');
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(true);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const processPDF = async () => {
-      try {
-        if (!user) throw new Error('User not found');
-
-        const pdfProcessor = new PdfProcessor();
-        pdfProcessor.init(user.id);
-
-        const filePath = await pdfProcessor.uploadFile(pdfFile);
-        if (!filePath) {
-          // Check if error is due to duplicate file
-          if (error?.includes('duplicate key value')) {
-            throw new Error('This PDF has already been processed');
-          }
-          throw new Error('Failed to upload PDF');
-        }
-
-        const result = await pdfProcessor.processPDF(filePath);
-        if (!result.success) {
-          throw new Error(result.errorMessage || 'Failed to process PDF');
-        }
-
-        setAnalysisResult(result.data);
-      } catch (err) {
-        console.error('Error processing PDF:', err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'An error occurred while processing PDF'
-        );
-      } finally {
-        setIsProcessing(false);
-      }
-    };
+    // console.log('PDFReviewAnalysis useEffect', pdfFile, user, error);
 
     processPDF();
-  }, [pdfFile, user, error]);
+  }, []);
+
+  const processPDF = async () => {
+    console.log('processPDF');
+    try {
+      if (!user) throw new Error('User not found');
+
+      const pdfProcessor = new PdfProcessor();
+      pdfProcessor.init(user.id);
+
+      const filePath = await pdfProcessor.uploadFile(pdfFile);
+      if (!filePath) {
+        // Check if error is due to duplicate file
+        if (error?.includes('duplicate key value')) {
+          throw new Error('This PDF has already been processed');
+        }
+        throw new Error('Failed to upload PDF');
+      }
+
+      const result = await pdfProcessor.processPDF(filePath);
+      if (!result.success) {
+        throw new Error(result.errorMessage || 'Failed to process PDF');
+      }
+
+      setAnalysisResult(result.data);
+    } catch (err) {
+      console.error('Error processing PDF:', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'An error occurred while processing PDF'
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -72,7 +76,8 @@ export function PDFReviewAnalysis({
           <p className="text-red-600">{error}</p>
           {error.includes('already been processed') && (
             <p className="mt-2 text-sm text-red-500">
-              Please select a different PDF file or check your uploaded documents.
+              Please select a different PDF file or check your uploaded
+              documents.
             </p>
           )}
         </div>
@@ -104,3 +109,5 @@ export function PDFReviewAnalysis({
     </div>
   );
 }
+PDFReviewAnalysis.whyDidYouRender = true;
+export { PDFReviewAnalysis };

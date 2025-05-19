@@ -5,27 +5,27 @@ import { useAccounts } from '../hooks/useAccounts';
 import { FileProcessor } from '../components/transaction/FileProcessor';
 import { Transaction } from '../types/transaction';
 
-export function Dashboard() {
-  console.log('Dashboard');
-  const { user } = useAuth();
+function Dashboard() {
+  const { userId } = useAuth();
   const { accounts } = useAccounts();
   const [categoryCount, setCategoryCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
     []
   );
-  if (!user) {
+  if (!userId) {
+    console.log('No user found');
     return <div>Please log in to view your dashboard.</div>;
   }
   useEffect(() => {
     async function checkSupabaseConnection() {
-      if (!user) return;
+      if (!userId) return;
 
       try {
         const { count, error } = await supabase
           .from('categories')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
 
         if (error) throw error;
         setCategoryCount(count);
@@ -36,11 +36,11 @@ export function Dashboard() {
     }
 
     checkSupabaseConnection();
-  }, [user]);
+  }, [userId]);
 
   const handleTransactionsLoaded = (transactions: Transaction[]) => {
     // Update recent transactions in state
-    setRecentTransactions((current) => [...transactions, ...current]);
+    // setRecentTransactions((current) => [...transactions, ...current]);
 
     // You could also trigger other actions when transactions are loaded
     console.log(`${transactions.length} transactions loaded`);
@@ -50,11 +50,7 @@ export function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
 
-      <FileProcessor
-        onTransactionsLoaded={handleTransactionsLoaded}
-        accounts={accounts}
-        acceptedFileTypes={['.csv', '.pdf']}
-      />
+      <FileProcessor />
 
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">
@@ -69,12 +65,12 @@ export function Dashboard() {
               You have {categoryCount === null ? '...' : categoryCount}{' '}
               {categoryCount === 1 ? 'category' : 'categories'} in your account.
             </p>
-            <p className="text-gray-600">User ID: {user.id}</p>
+            <p className="text-gray-600">User ID: {userId}</p>
           </div>
         )}
       </div>
 
-      {recentTransactions.length > 0 && (
+      {/* {recentTransactions.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">
             Recently Imported Transactions
@@ -84,7 +80,9 @@ export function Dashboard() {
             {recentTransactions.length !== 1 ? 's' : ''} imported
           </p>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
+Dashboard.whyDidYouRender = false;
+export { Dashboard };

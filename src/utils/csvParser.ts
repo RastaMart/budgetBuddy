@@ -1,3 +1,9 @@
+export interface CSVFormatedData {
+  headers: string[];
+  rows: string[][];
+  hasHeaders: boolean;
+}
+
 export function parseCSVLine(line: string): string[] {
   const fields: string[] = [];
   let field = '';
@@ -29,9 +35,7 @@ export function parseCSVLine(line: string): string[] {
   return fields;
 }
 
-export function readCSVFile(
-  content: string | File
-): Promise<{ headers: string[]; rows: string[][]; hasHeaders: boolean }> {
+export function readCSVFile(content: string | File): Promise<CSVFormatedData> {
   return new Promise((resolve, reject) => {
     // If content is already a string, process it directly
     if (typeof content === 'string') {

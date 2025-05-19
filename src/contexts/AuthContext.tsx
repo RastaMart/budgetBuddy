@@ -1,7 +1,7 @@
-import React, { createContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
-import type { User } from "@supabase/supabase-js";
+import React, { createContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import type { User } from '@supabase/supabase-js';
 
 interface Profile {
   id: string;
@@ -13,6 +13,7 @@ interface Profile {
 
 interface AuthContextType {
   user: User | null;
+  userId: string | null;
   profile: Profile | null;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -24,6 +25,7 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
+  userId: null,
   profile: null,
   signIn: async () => {},
   signInWithGoogle: async () => {},
@@ -60,18 +62,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // First try to fetch existing profile
       const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
         .single();
 
       if (existingProfile) {
         setProfile(existingProfile);
       } else {
-        console.log("Profile not found, creating a new one...");
+        console.log('Profile not found, creating a new one...');
         // Profile doesn't exist, create it
         const { data: newProfile, error: insertError } = await supabase
-          .from("profiles")
+          .from('profiles')
           .insert([
             {
               id: user.id,
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false);
     } catch (error) {
-      console.error("Error handling profile:", error);
+      console.error('Error handling profile:', error);
       setLoading(false);
     }
   }
@@ -103,22 +105,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        if (error.message === "Invalid login credentials") {
-          throw new Error("Invalid email or password");
+        if (error.message === 'Invalid login credentials') {
+          throw new Error('Invalid email or password');
         }
         throw error;
       }
 
-      navigate("/");
+      navigate('/');
     } catch (error: any) {
-      console.error("Sign in error:", error);
+      console.error('Sign in error:', error);
       throw error;
     }
   }
 
   async function signInWithGoogle() {
     await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
@@ -138,10 +140,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (signUpError) throw signUpError;
-      if (!data.user) throw new Error("User creation failed");
+      if (!data.user) throw new Error('User creation failed');
     } catch (error: any) {
-      console.error("Signup error:", error);
-      throw new Error(error.message || "Failed to create account");
+      console.error('Signup error:', error);
+      throw new Error(error.message || 'Failed to create account');
     }
   }
 
@@ -149,15 +151,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      navigate("/auth/login", { replace: true });
+      navigate('/auth/login', { replace: true });
     } catch (error) {
-      console.error("Sign out error:", error);
+      console.error('Sign out error:', error);
       throw error;
     }
   }
 
   const value = {
     user,
+    userId: user?.id || null,
     profile,
     signIn,
     signInWithGoogle,

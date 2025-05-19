@@ -16,7 +16,7 @@ export function CSVReviewMapping({
   onRefuseMap,
   onAcceptMapping,
 }: CCSVReviewMappingProps) {
-  const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>({});
+  // const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>({});
 
   // Get 3 random transactions for preview
   const sampleTransactions = useMemo(() => {

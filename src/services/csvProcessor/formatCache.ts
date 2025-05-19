@@ -1,5 +1,6 @@
 // src/services/csvProcessor/formatCache.ts
 import { supabase } from '../../lib/supabase';
+import { ColumnMapping } from '../../types/columnMapping';
 
 /**
  * Interface for format mapping data structure
@@ -43,7 +44,7 @@ class FormatCache {
         .select('*')
         .eq('format_signature', formatSignature)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) {
         if (error.code === 'PGRST116') {
@@ -71,21 +72,25 @@ class FormatCache {
    */
   async saveFormat(
     formatSignature: string,
-    formatMapping: FormatMapping,
+    columnMapping: ColumnMapping,
     userId: string
   ): Promise<boolean> {
+    console.log('saveFormat', formatSignature, columnMapping, userId);
     try {
       // Check if this format signature already exists
       const existingFormat = await this.getFormat(formatSignature);
 
       if (existingFormat) {
         // Update existing format if it's changed
+        const usage_count =
+          parseInt(existingFormat?.usage_count.toString(), 10) || 0;
+
         const { error } = await supabase
           .from(this.tableName)
           .update({
-            format_mapping: formatMapping,
+            format_mapping: columnMapping,
             updated_at: new Date().toISOString(),
-            usage_count: supabase.sql`usage_count + 1`,
+            usage_count: usage_count + 1,
           })
           .eq('format_signature', formatSignature);
 
@@ -97,7 +102,7 @@ class FormatCache {
         // Insert new format mapping
         const { error } = await supabase.from(this.tableName).insert({
           format_signature: formatSignature,
-          format_mapping: formatMapping,
+          format_mapping: columnMapping,
           created_by: userId,
           created_at: new Date().toISOString(),
           usage_count: 1,
