@@ -1,7 +1,7 @@
 import { format, parseISO } from 'date-fns';
-import { Amount } from '../shared/Amount';
-import { CSVTransaction } from '../../types/csv';
-import { useAccounts } from '../../hooks/useAccounts';
+import { Amount } from '../../shared/Amount';
+import { CSVTransaction } from '../../../types/csv';
+import { useAccounts } from '../../../hooks/useAccounts';
 
 interface CSVReviewTransactionsProps {
   parsedTransactions: CSVTransaction[];

@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CSVDropzone } from '../transaction/CSVDropzone';
+import { useState, useEffect } from 'react';
 import { CSVPreview, CSVTransaction, ImportError } from '../../types/csv';
-import { Account } from '../../types/account';
 import { Transaction, RawTransaction } from '../../types/transaction';
 import {
   parseDate,
@@ -12,13 +10,13 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
 import { CsvProcessor } from '../../services/csvProcessor/csvProcessor';
 import { CSVProcessing } from './step_1_process/CSVProcessing';
-import { CSVDateColumnSelector } from './CSVDateColumnSelector';
+import { CSVDateColumnSelector } from './step_2_mapping/CSVDateColumnSelector';
 import { CSVDescriptionColumnSelector } from './step_2_mapping/CSVDescriptionColumnSelector';
 import { CSVAmountTypeSelector } from './step_2_mapping/CSVAmountTypeSelector';
-import { CSVAmountColumnSelector } from './CSVAmountColumnSelector';
+import { CSVAmountColumnSelector } from './step_2_mapping/CSVAmountColumnSelector';
 import { CSVSplitAmountColumnSelector } from './step_2_mapping/CSVSplitAmountColumnSelector';
-import { CSVReviewMapping } from './CSVReviewMapping';
-import { CSVReviewTransactions } from './CSVReviewTransactions';
+import { CSVReviewMapping } from './step_2_mapping/CSVReviewMapping';
+import { CSVReviewTransactions } from './step_3_transactions/CSVReviewTransactions';
 import { CSVImporting } from './step_3_transactions/CSVImporting';
 import { CSVImportComplete } from './step_5_completed/CSVImportComplete';
 import { CSVFormatedData, readCSVFile } from '../../utils/csvParser';
