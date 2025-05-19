@@ -1,16 +1,16 @@
-import React from 'react';
-import { CSVPreview } from '../../types/csv';
+import { ColumnMapping } from '../../../types/columnMapping';
+import { CSVData } from '../../../types/csv';
 
 interface ColumnMappingProps {
-  csvPreview: CSVPreview;
-  columnMapping: Record<string, number>;
+  csvData: CSVData;
+  columnMapping: ColumnMapping;
   onColumnSelect: (columnIndex: number) => void;
   title: string;
   description: string;
 }
 
 export function CSVColumnMapping({
-  csvPreview,
+  csvData,
   columnMapping,
   onColumnSelect,
   title,
@@ -27,23 +27,24 @@ export function CSVColumnMapping({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="sticky top-0 bg-white">
               <tr>
-                {csvPreview.headers.map((header, i) => (
-                  <th
-                    key={i}
-                    className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-50 ${
-                      Object.values(columnMapping).includes(i)
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'text-gray-500'
-                    }`}
-                    onClick={() => onColumnSelect(i)}
-                  >
-                    {header}
-                  </th>
-                ))}
+                {csvData.headers &&
+                  csvData.headers.map((header, i) => (
+                    <th
+                      key={i}
+                      className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-50 ${
+                        Object.values(columnMapping).includes(i)
+                          ? 'bg-indigo-50 text-indigo-700'
+                          : 'text-gray-500'
+                      }`}
+                      onClick={() => onColumnSelect(i)}
+                    >
+                      {header}
+                    </th>
+                  ))}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {csvPreview.rows.map((row, i) => (
+              {csvData.rows.map((row, i) => (
                 <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {row.map((cell, j) => (
                     <td

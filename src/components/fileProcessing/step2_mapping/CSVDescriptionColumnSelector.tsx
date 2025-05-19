@@ -1,9 +1,8 @@
-import React from 'react';
 import { CSVColumnMapping } from './CSVColumnMapping';
-import { CSVPreview } from '../../../types/csv';
+import { CSVData } from '../../../types/csv';
 
 interface CSVDescriptionColumnSelectorProps {
-  csvPreview: CSVPreview;
+  csvData: CSVData;
   columnMapping: {
     date?: number;
     description?: number;
@@ -15,13 +14,13 @@ interface CSVDescriptionColumnSelectorProps {
 }
 
 export function CSVDescriptionColumnSelector({
-  csvPreview,
+  csvData,
   columnMapping,
   onColumnSelect,
 }: CSVDescriptionColumnSelectorProps) {
   return (
     <CSVColumnMapping
-      csvPreview={csvPreview}
+      csvData={csvData}
       columnMapping={columnMapping}
       onColumnSelect={onColumnSelect}
       title="Select Description Column"

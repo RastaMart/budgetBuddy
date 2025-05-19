@@ -1,18 +1,4 @@
-export interface CSVPreview {
-  headers: string[];
+export interface CSVData {
+  headers: string[] | null;
   rows: string[][];
-}
-
-export interface CSVTransaction {
-  date: string;
-  description: string;
-  amount: string;
-  isDuplicate?: boolean;
-  selected?: boolean;
-}
-
-export interface ImportError {
-  row: number;
-  error: string;
-  data: CSVTransaction;
 }

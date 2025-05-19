@@ -2,8 +2,12 @@ export type TransactionType = 'account' | 'virtual' | 'income_distribution';
 
 export interface RawTransaction {
   amount: number;
+  incomeAmount: number;
+  expenseAmount: number;
   description: string;
   date: string;
+  isDuplicate?: boolean;
+  selected?: boolean;
 }
 
 export interface Transaction {
@@ -47,4 +51,10 @@ export interface CreateTransactionInput {
   date: string;
   type: TransactionType;
   note?: string;
+}
+
+export interface TransactionsImportError {
+  row: number;
+  error: string;
+  data: RawTransaction;
 }

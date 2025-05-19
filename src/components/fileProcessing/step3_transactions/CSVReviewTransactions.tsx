@@ -1,11 +1,11 @@
 import { format, parseISO } from 'date-fns';
 import { Amount } from '../../shared/Amount';
-import { CSVTransaction } from '../../../types/csv';
 import { useAccounts } from '../../../hooks/useAccounts';
+import { RawTransaction } from '../../../types/transaction';
 
 interface CSVReviewTransactionsProps {
-  parsedTransactions: CSVTransaction[];
-  selectedAccount: string;
+  transactions: RawTransaction[];
+  selectedAccount: string | null;
   onSelectAccount: (accountId: string) => void;
   onToggleTransaction: (index: number) => void;
   onToggleAllTransactions: (selected: boolean) => void;
@@ -14,7 +14,7 @@ interface CSVReviewTransactionsProps {
 }
 
 export function CSVReviewTransactions({
-  parsedTransactions,
+  transactions,
   selectedAccount,
   onSelectAccount,
   onToggleTransaction,
@@ -23,6 +23,17 @@ export function CSVReviewTransactions({
   onCancel,
 }: CSVReviewTransactionsProps) {
   const { accounts } = useAccounts();
+
+  const handleSelectAccount = (e: { target: { value: string } }) => {
+    onSelectAccount(e.target.value);
+  };
+  const handleToggleTransaction = (index: number) => {
+    onToggleTransaction(index);
+  };
+  const handleToggleAllTransaction = (e: { target: { checked: boolean } }) => {
+    onToggleAllTransactions(e.target.checked);
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg shadow">
@@ -41,8 +52,8 @@ export function CSVReviewTransactions({
             Select Account
           </label>
           <select
-            value={selectedAccount}
-            onChange={(e) => onSelectAccount(e.target.value)}
+            value={selectedAccount || ''}
+            onChange={handleSelectAccount}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             required
           >
@@ -75,8 +86,8 @@ export function CSVReviewTransactions({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   <input
                     type="checkbox"
-                    checked={parsedTransactions.every((t) => t.selected)}
-                    onChange={(e) => onToggleAllTransactions(e.target.checked)}
+                    checked={transactions.every((t) => t.selected)}
+                    onChange={handleToggleAllTransaction}
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                 </th>
@@ -95,7 +106,7 @@ export function CSVReviewTransactions({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {parsedTransactions.map((transaction, index) => (
+              {transactions.map((transaction, index) => (
                 <tr
                   key={index}
                   className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
@@ -104,7 +115,7 @@ export function CSVReviewTransactions({
                     <input
                       type="checkbox"
                       checked={transaction.selected}
-                      onChange={() => onToggleTransaction(index)}
+                      onChange={() => handleToggleTransaction(index)}
                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                   </td>
@@ -126,7 +137,7 @@ export function CSVReviewTransactions({
                     {transaction.description}
                   </td>
                   <td className="px-4 py-2 text-sm text-right whitespace-nowrap">
-                    <Amount value={parseFloat(transaction.amount)} />
+                    <Amount value={transaction.amount} />
                   </td>
                 </tr>
               ))}
@@ -136,8 +147,8 @@ export function CSVReviewTransactions({
         <div className="p-4 border-t bg-gray-50">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
-              {parsedTransactions.filter((t) => t.selected).length} of{' '}
-              {parsedTransactions.length} transactions selected
+              {transactions.filter((t) => t.selected).length} of{' '}
+              {transactions.length} transactions selected
             </div>
             <div className="flex gap-2">
               <button
@@ -149,8 +160,7 @@ export function CSVReviewTransactions({
               <button
                 onClick={onImport}
                 disabled={
-                  !parsedTransactions.some((t) => t.selected) ||
-                  !selectedAccount
+                  !transactions.some((t) => t.selected) || !selectedAccount
                 }
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >

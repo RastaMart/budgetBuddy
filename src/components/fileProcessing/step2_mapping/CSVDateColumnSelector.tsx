@@ -1,27 +1,21 @@
-import React from 'react';
 import { CSVColumnMapping } from './CSVColumnMapping';
-import { CSVPreview } from '../../types/csv';
+import { CSVData } from '../../../types/csv';
+import { ColumnMapping } from '../../../types/columnMapping';
 
 interface CSVDateColumnSelectorProps {
-  csvPreview: CSVPreview;
-  columnMapping: {
-    date?: number;
-    description?: number;
-    amount?: number;
-    spending?: number;
-    deposit?: number;
-  };
+  csvData: CSVData;
+  columnMapping: ColumnMapping;
   onColumnSelect: (columnIndex: number) => void;
 }
 
 export function CSVDateColumnSelector({
-  csvPreview,
+  csvData,
   columnMapping,
   onColumnSelect,
 }: CSVDateColumnSelectorProps) {
   return (
     <CSVColumnMapping
-      csvPreview={csvPreview}
+      csvData={csvData}
       columnMapping={columnMapping}
       onColumnSelect={onColumnSelect}
       title="Select Date Column"

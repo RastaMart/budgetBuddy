@@ -1,31 +1,54 @@
 import { useState, useEffect } from 'react';
-import { CSVPreview, CSVTransaction, ImportError } from '../../types/csv';
+import {
+  CSVData,
+  CSVPreview,
+  CSVTransaction,
+  ImportError,
+} from '../../types/csv';
 import { Transaction, RawTransaction } from '../../types/transaction';
 import {
   parseDate,
   cleanAmount,
   cleanDescription,
-} from '../../utils/dateParser';
+} from '../../utils/dataParser';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
 import { CsvProcessor } from '../../services/csvProcessor/csvProcessor';
-import { CSVProcessing } from './step_1_process/CSVProcessing';
-import { CSVDateColumnSelector } from './step_2_mapping/CSVDateColumnSelector';
-import { CSVDescriptionColumnSelector } from './step_2_mapping/CSVDescriptionColumnSelector';
-import { CSVAmountTypeSelector } from './step_2_mapping/CSVAmountTypeSelector';
-import { CSVAmountColumnSelector } from './step_2_mapping/CSVAmountColumnSelector';
-import { CSVSplitAmountColumnSelector } from './step_2_mapping/CSVSplitAmountColumnSelector';
-import { CSVReviewMapping } from './step_2_mapping/CSVReviewMapping';
-import { CSVReviewTransactions } from './step_3_transactions/CSVReviewTransactions';
-import { CSVImporting } from './step_3_transactions/CSVImporting';
-import { CSVImportComplete } from './step_5_completed/CSVImportComplete';
+import {
+  CSVProcessing,
+  FileContentProcessing,
+  FileContentProcessingResponse,
+} from './step1_process/FileContentProcessing';
+import { CSVDateColumnSelector } from './step2_mapping/CSVDateColumnSelector';
+import { CSVDescriptionColumnSelector } from './step2_mapping/CSVDescriptionColumnSelector';
+import { CSVAmountTypeSelector } from './step2_mapping/CSVAmountTypeSelector';
+import { CSVAmountColumnSelector } from './step2_mapping/CSVAmountColumnSelector';
+import { CSVSplitAmountColumnSelector } from './step2_mapping/CSVSplitAmountColumnSelector';
+import { CSVReviewMapping } from './step2_mapping/CSVReviewMapping';
+import { CSVReviewTransactions } from './step3_transactions/CSVReviewTransactions';
+import { CSVImporting } from './step3_transactions/CSVImporting';
+import { CSVImportComplete } from './step5_completed/CSVImportComplete';
 import { CSVFormatedData, readCSVFile } from '../../utils/csvParser';
 import { ColumnMapping } from '../../types/columnMapping';
+import { UploadFile } from './step0_upload/UploadFile';
+import { StepMapping } from './step2_mapping/StepMapping';
+import StepTransactions from './step3_transactions/StepTransactions';
 
 interface CSVImportProps {
   onTransactionsLoaded: (transactions: Transaction[]) => void;
   onClose?: () => void;
   file: File;
+}
+interface Steps {
+  upload: {
+    fileContent: string;
+    csvData: CSVFormatedData;
+  } | null;
+  process: FileContentProcessingResponse | null;
+  mapping: ColumnMapping | null;
+  transactions: boolean | null;
+  learn: boolean | null;
+  complete: boolean | null;
 }
 
 export function CSVImport({
@@ -38,10 +61,24 @@ export function CSVImport({
   if (!user) {
     throw new Error('User not found');
   }
+
+  const emptyMapping: ColumnMapping = {
+    date: undefined,
+    description: undefined,
+    amount: undefined,
+    expenseAmount: undefined,
+    incomeAmount: undefined,
+  };
+
   const [error, setError] = useState<string | null>(null);
-  const [csvPreview, setCsvPreview] = useState<CSVPreview | null>(null);
-  const [rawContent, setRawContent] = useState<string>('');
-  const [rawTransactions, setRawTransactions] = useState<RawTransaction[]>([]);
+  const [steps, setSteps] = useState<Steps>({
+    upload: null,
+    process: null,
+    mapping: null,
+    transactions: null,
+    learn: null,
+    complete: null,
+  });
   const [mappingStep, setMappingStep] = useState<
     | 'initial'
     | 'processing'
@@ -56,432 +93,299 @@ export function CSVImport({
     | 'complete'
     | 'error'
   >('initial');
-  const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>({});
-  const [formatSignature, setFormatSignature] = useState<string | null>(null);
 
-  const [isSingleAmountColumn, setIsSingleAmountColumn] = useState<
-    boolean | null
-  >(null);
-  const [importStats, setImportStats] = useState<{
-    total: number;
-    successful: number;
-    failed: number;
-    errors: ImportError[];
-  }>({ total: 0, successful: 0, failed: 0, errors: [] });
-  const [parsedTransactions, setParsedTransactions] = useState<
-    CSVTransaction[]
-  >([]);
+  // const [importStats, setImportStats] = useState<{
+  //   total: number;
+  //   successful: number;
+  //   failed: number;
+  //   errors: ImportError[];
+  // }>({ total: 0, successful: 0, failed: 0, errors: [] });
+  // const [parsedTransactions, setParsedTransactions] = useState<
+  //   CSVTransaction[]
+  // >([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const [uploadedDocument, setUploadedDocument] = useState<{
-    id: string;
-    file_path: string;
-  } | null>(null);
+  // const [uploadedDocument, setUploadedDocument] = useState<{
+  //   id: string;
+  //   file_path: string;
+  // } | null>(null);
 
   csvProcessor.init(user.id);
 
-  useEffect(() => {
-    if (file) {
-      processFile(file);
+  // useEffect(() => {
+  //   if (file) {
+  //     processFile(file);
+  //   }
+  // }, [file]);
+
+  // const processFile = async (file: File) => {
+  //   try {
+  //     setMappingStep('processing');
+  //     setError(null);
+
+  //     const content = await csvProcessor.uploadFile(file);
+  //     if (!content) {
+  //       throw new Error('Failed to read file content');
+  //     }
+  //     setRawContent(content);
+  //     // processCSV
+  //     const {
+  //       success,
+  //       rawTransactions: newRawTransactions,
+  //       mapping,
+  //       formatSignature: newFormatSignature,
+  //       confidence,
+  //       errorMessage,
+  //     } = await csvProcessor.processCSV(content);
+
+  //     if (!success && errorMessage) {
+  //       throw new Error(errorMessage);
+  //     }
+  //     if (newFormatSignature) {
+  //       setFormatSignature(newFormatSignature);
+  //     }
+
+  //     const { headers, rows, hasHeaders } = await readCSVFile(content);
+  //     setCsvPreview({ headers, rows });
+
+  //     if (success && confidence > 0.95 && mapping != null) {
+  //       // setColumnMapping(mapping); // Done in handleAcceptMapping
+  //       if (newRawTransactions) {
+  //         await setRawTransactions(newRawTransactions);
+  //       }
+  //       await handleAcceptMapping(mapping, { headers, rows, hasHeaders });
+  //     } else if (success && confidence > 0.3 && mapping != null) {
+  //       await setColumnMapping(mapping);
+  //       if (newRawTransactions) {
+  //         await setRawTransactions(newRawTransactions);
+  //       }
+  //       setMappingStep('reviewMapping');
+  //     } else {
+  //       // Parse CSV content
+  //       setMappingStep('date');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error processing CSV file:', error);
+
+  //     setError(
+  //       'Error processing CSV file. Please check the format and try again.'
+  //     );
+  //     setMappingStep('initial');
+  //   }
+  // };
+
+  // const renderMappingStep = () => {
+  //   if (!csvPreview || !columnMapping) return null;
+
+  //   switch (mappingStep) {
+  //     case 'date':
+  //       return (
+  //         <CSVDateColumnSelector
+  //           csvPreview={csvPreview}
+  //           columnMapping={columnMapping}
+  //           onColumnSelect={handleColumnSelect}
+  //         />
+  //       );
+  //     case 'description':
+  //       return (
+  //         <CSVDescriptionColumnSelector
+  //           csvPreview={csvPreview}
+  //           columnMapping={columnMapping}
+  //           onColumnSelect={handleColumnSelect}
+  //         />
+  //       );
+  //     case 'amount-type':
+  //       return (
+  //         <CSVAmountTypeSelector
+  //           onAmountTypeSelection={handleAmountTypeSelection}
+  //         />
+  //       );
+  //     case 'amount':
+  //       return (
+  //         <CSVAmountColumnSelector
+  //           csvPreview={csvPreview}
+  //           columnMapping={columnMapping}
+  //           onColumnSelect={handleColumnSelect}
+  //         />
+  //       );
+  //     case 'amount-split':
+  //       return (
+  //         <CSVSplitAmountColumnSelector
+  //           csvPreview={csvPreview}
+  //           columnMapping={columnMapping}
+  //           onColumnSelect={handleColumnSelect}
+  //         />
+  //       );
+  //     case 'reviewMapping':
+  //       return (
+  //         <CSVReviewMapping
+  //           rawTransactions={rawTransactions}
+  //           rawContent={rawContent}
+  //           onRefuseMap={handleRefuseMapping}
+  //           onAcceptMapping={handleAcceptMapping}
+  //         />
+  //       );
+  //   }
+  // };
+  // const steps = {
+  //   process: mappingStep === 'processing',
+  //   mapping: ['date', 'description', 'amount-type', 'amount', 'amount-split'].includes(mappingStep),
+  //   transactions: ['reviewTransaction', 'importing'].includes(mappingStep),
+  //   learn: mappingStep === 'learn',
+  //   complete: mappingStep === 'complete',
+  // };
+
+  const handleError = (error: string) => {
+    setError(error);
+    setMappingStep('error');
+  };
+  const handleFileUploaded = async (fileContent: string) => {
+    const csvData = await readCSVFile(fileContent);
+    setSteps((prev) => ({
+      ...prev,
+      upload: {
+        fileContent,
+        csvData,
+      },
+    }));
+  };
+  const handleFileProcessed = (response: FileContentProcessingResponse) => {
+    console.log('handleFileProcessed', response);
+    setSteps((prev) => ({
+      ...prev,
+      process: response,
+    }));
+  };
+  const handleMappingConfirmed = (mapping: ColumnMapping) => {
+    setSteps((prev) => ({
+      ...prev,
+      process: prev.process
+        ? {
+            ...prev.process,
+            confidence: 1,
+          }
+        : null,
+      mapping,
+    }));
+  };
+  const getCurrentStep = () => {
+    if (error) {
+      return 'error';
     }
-  }, [file]);
-
-  const processFile = async (file: File) => {
-    try {
-      setMappingStep('processing');
-      setError(null);
-
-      const content = await csvProcessor.uploadFile(file);
-      if (!content) {
-        throw new Error('Failed to read file content');
-      }
-      setRawContent(content);
-      // processCSV
-      const {
-        success,
-        rawTransactions: newRawTransactions,
-        mapping,
-        formatSignature: newFormatSignature,
-        confidence,
-        errorMessage,
-      } = await csvProcessor.processCSV(content);
-      console.log({
-        success,
-        newRawTransactions,
-        mapping,
-        newFormatSignature,
-        confidence,
-        errorMessage,
-      });
-      if (!success && errorMessage) {
-        throw new Error(errorMessage);
-      }
-      if (newFormatSignature) {
-        setFormatSignature(newFormatSignature);
-      }
-
-      const { headers, rows, hasHeaders } = await readCSVFile(content);
-      console.log('do setCsvPreview', headers, rows);
-      setCsvPreview({ headers, rows });
-
-      if (success && confidence > 0.95 && mapping != null) {
-        // setColumnMapping(mapping); // Done in handleAcceptMapping
-        if (newRawTransactions) {
-          await setRawTransactions(newRawTransactions);
-        }
-        await handleAcceptMapping(mapping, { headers, rows, hasHeaders });
-      } else if (success && confidence > 0.3 && mapping != null) {
-        await setColumnMapping(mapping);
-        if (newRawTransactions) {
-          await setRawTransactions(newRawTransactions);
-        }
-        setMappingStep('reviewMapping');
-      } else {
-        // Parse CSV content
-        setMappingStep('date');
-      }
-    } catch (error) {
-      console.error('Error processing CSV file:', error);
-
-      setError(
-        'Error processing CSV file. Please check the format and try again.'
-      );
-      setMappingStep('initial');
+    if (
+      steps.process?.rawTransactions &&
+      steps.process?.mapping &&
+      steps.process?.confidence >= 0.95
+    ) {
+      return 'transactions';
     }
-  };
-
-  const handleRefuseMapping = () => {
-    if (formatSignature) {
-      csvProcessor.handleMappingRefuse(formatSignature);
+    if (
+      steps.process?.rawTransactions &&
+      steps.process?.mapping &&
+      steps.process?.confidence < 0.95
+    ) {
+      return 'mapping';
     }
-    setColumnMapping({
-      date: undefined,
-      description: undefined,
-      amount: undefined,
-      expenseAmount: undefined,
-      incomeAmount: undefined,
-    });
-    setMappingStep('date');
-  };
-  const handleAcceptMapping = async (
-    newMapping: ColumnMapping,
-    csvData?: CSVFormatedData
-  ) => {
-    console.log('handleAcceptMapping', formatSignature, newMapping, csvData);
-    console.log('set newMapping', newMapping);
-    setColumnMapping(newMapping);
-    await processTransactions(newMapping, csvData);
-  };
-
-  const handleColumnSelect = async (columnIndex: number) => {
-    const newMapping = { ...columnMapping };
-
-    switch (mappingStep) {
-      case 'date':
-        newMapping.date = columnIndex;
-        setColumnMapping(newMapping);
-        setMappingStep('description');
-        break;
-      case 'description':
-        newMapping.description = columnIndex;
-        setColumnMapping(newMapping);
-        setMappingStep('amount-type');
-        break;
-      case 'amount':
-        newMapping.amount = columnIndex;
-        setColumnMapping(newMapping);
-        await processTransactions(newMapping);
-        break;
-      case 'amount-split':
-        if (!newMapping.expenseAmount) {
-          newMapping.expenseAmount = columnIndex;
-          setColumnMapping(newMapping);
-        } else {
-          newMapping.incomeAmount = columnIndex;
-          setColumnMapping(newMapping);
-          await processTransactions(newMapping);
-        }
-        break;
+    if (steps.upload?.fileContent) {
+      return 'process';
     }
+    return 'upload';
   };
-
-  const processTransactions = async (
-    mapping: typeof columnMapping,
-    csvData?: CSVFormatedData
-  ) => {
-    if (formatSignature && mapping) {
-      console.log('do handleMappingAccepted', formatSignature, mapping);
-      csvProcessor.handleMappingAccepted(formatSignature, mapping);
-    }
-
-    console.log('processTransactions', mapping, csvPreview);
-    if (!csvPreview && !csvData) return;
-
-    const { transactions } = await validateAndParseData(
-      (csvPreview || csvData)?.rows || [],
-      mapping
-    );
-    const transactionsWithDuplicates = await checkForDuplicates(transactions);
-    console.log('do setParsedTransactions', transactionsWithDuplicates);
-    setParsedTransactions(transactionsWithDuplicates);
-
-    setMappingStep('reviewTransaction');
-  };
-
-  const handleAmountTypeSelection = (singleColumn: boolean) => {
-    setIsSingleAmountColumn(singleColumn);
-    setMappingStep(singleColumn ? 'amount' : 'amount-split');
-  };
-
-  const checkForDuplicates = async (transactions: CSVTransaction[]) => {
-    if (!user) throw new Error('User not found');
-
-    const duplicateChecks = await Promise.all(
-      transactions.map(async (transaction) => {
-        const { data } = await supabase
-          .from('transactions')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('date', transaction.date)
-          .eq('description', transaction.description)
-          .eq('amount', parseFloat(transaction.amount));
-
-        return {
-          ...transaction,
-          isDuplicate: (data?.length || 0) > 0,
-          selected: (data?.length || 0) === 0,
-        };
-      })
-    );
-
-    return duplicateChecks;
-  };
-
-  const validateAndParseData = async (
-    rows: string[][],
-    mapping: typeof columnMapping
-  ): Promise<{
-    transactions: CSVTransaction[];
-    invalidRows: Array<{ row: number; errors: string[] }>;
-  }> => {
-    if (!mapping) {
-      throw new Error('Mapping is not defined');
-    }
-    const results = {
-      transactions: [] as CSVTransaction[],
-      invalidRows: [] as Array<{ row: number; errors: string[] }>,
-    };
-
-    for (const [index, row] of rows.entries()) {
-      const errors: string[] = [];
-      const transaction: CSVTransaction = {
-        date: '',
-        description: '',
-        amount: '0',
-        selected: true,
-      };
-
-      // Parse date
-      if (mapping.date !== undefined) {
-        const parsedDate = parseDate(row[mapping.date]);
-        if (!parsedDate) {
-          errors.push(`Invalid date format: ${row[mapping.date]}`);
-        } else {
-          transaction.date = parsedDate;
-        }
-      }
-
-      // Parse description
-      if (mapping.description !== undefined) {
-        const cleanedDescription = cleanDescription(row[mapping.description]);
-        if (!cleanedDescription) {
-          errors.push('Description is required');
-        } else {
-          transaction.description = cleanedDescription;
-        }
-      }
-
-      // Parse amount
-      let amount = '0';
-      if (isSingleAmountColumn && mapping.amount !== undefined) {
-        amount = cleanAmount(row[mapping.amount]);
-      } else if (
-        !isSingleAmountColumn &&
-        mapping.expenseAmount &&
-        mapping.incomeAmount
-      ) {
-        const expenseAmount = cleanAmount(row[mapping.expenseAmount]);
-        const incomeAmount = cleanAmount(row[mapping.incomeAmount]);
-        amount = (
-          parseFloat(incomeAmount) - parseFloat(expenseAmount)
-        ).toString();
-      }
-
-      if (amount === '0' || isNaN(parseFloat(amount))) {
-        errors.push('Invalid amount');
-      } else {
-        transaction.amount = amount;
-      }
-
-      if (errors.length > 0) {
-        results.invalidRows.push({ row: index + 1, errors });
-      } else {
-        results.transactions.push(transaction);
-      }
-    }
-
-    return results;
-  };
-
-  const toggleTransactionSelection = (index: number) => {
-    setParsedTransactions((current) =>
-      current.map((t, i) => (i === index ? { ...t, selected: !t.selected } : t))
-    );
-  };
-
-  const toggleAllTransactions = (selected: boolean) => {
-    setParsedTransactions((current) =>
-      current.map((t) => ({ ...t, selected }))
-    );
-  };
-
-  const importTransactions = async (transactions: CSVTransaction[]) => {
-    if (!selectedAccount) {
-      setError('Please select an account');
-      return;
-    }
-
-    if (!user) throw new Error('User not found');
-
-    setMappingStep('importing');
-    const stats = {
-      total: transactions.length,
-      successful: 0,
-      failed: 0,
-      errors: [] as ImportError[],
-    };
-
-    const selectedCSVTransactions = transactions.filter((t) => t.selected);
-    const newTransactions: Transaction[] = [];
-
-    for (const transaction of selectedCSVTransactions) {
-      try {
-        const { data, error } = await supabase
-          .from('transactions')
-          .insert({
-            user_id: user.id,
-            amount: parseFloat(transaction.amount),
-            description: transaction.description,
-            date: transaction.date,
-            assigned_date: transaction.date,
-            account_id: selectedAccount,
-            type: 'account',
-            document_id: uploadedDocument?.id,
-          })
-          .select();
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          newTransactions.push(data[0] as Transaction);
-        }
-        stats.successful++;
-      } catch (error) {
-        stats.failed++;
-        stats.errors.push({
-          row: stats.successful + stats.failed,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          data: transaction,
-        });
-      }
-    }
-
-    setImportStats(stats);
-    setMappingStep('complete');
-    onTransactionsLoaded(newTransactions);
-  };
-
-  const renderMappingStep = () => {
-    if (!csvPreview || !columnMapping) return null;
-
-    switch (mappingStep) {
-      case 'date':
-        return (
-          <CSVDateColumnSelector
-            csvPreview={csvPreview}
-            columnMapping={columnMapping}
-            onColumnSelect={handleColumnSelect}
-          />
-        );
-      case 'description':
-        return (
-          <CSVDescriptionColumnSelector
-            csvPreview={csvPreview}
-            columnMapping={columnMapping}
-            onColumnSelect={handleColumnSelect}
-          />
-        );
-      case 'amount-type':
-        return (
-          <CSVAmountTypeSelector
-            onAmountTypeSelection={handleAmountTypeSelection}
-          />
-        );
-      case 'amount':
-        return (
-          <CSVAmountColumnSelector
-            csvPreview={csvPreview}
-            columnMapping={columnMapping}
-            onColumnSelect={handleColumnSelect}
-          />
-        );
-      case 'amount-split':
-        return (
-          <CSVSplitAmountColumnSelector
-            csvPreview={csvPreview}
-            columnMapping={columnMapping}
-            onColumnSelect={handleColumnSelect}
-          />
-        );
-      case 'reviewTransaction':
-        return (
-          <CSVReviewTransactions
-            parsedTransactions={parsedTransactions}
-            selectedAccount={selectedAccount}
-            onSelectAccount={setSelectedAccount}
-            onToggleTransaction={toggleTransactionSelection}
-            onToggleAllTransactions={toggleAllTransactions}
-            onImport={() => importTransactions(parsedTransactions)}
-            onCancel={onClose}
-          />
-        );
-      case 'importing':
-        return <CSVImporting />;
-      case 'complete':
-        return (
-          <CSVImportComplete importStats={importStats} onClose={onClose} />
-        );
-    }
-  };
+  const currentStep = getCurrentStep();
+  console.log('currentStep', currentStep, steps);
   return (
     <div className="space-y-4">
-      {mappingStep === 'initial' && (
-        // <CSVDropzone onFileSelect={handleFileSelect} error={error} />
-        <p>Initialising...</p>
-      )}
-      {mappingStep === 'error' && (
-        // <CSVDropzone onFileSelect={handleFileSelect} error={error} />
-        <p>error</p>
-      )}
-      {mappingStep === 'processing' && <CSVProcessing />}
-      {mappingStep === 'reviewMapping' && (
-        <CSVReviewMapping
-          rawTransactions={rawTransactions}
-          rawContent={rawContent}
-          onRefuseMap={handleRefuseMapping}
-          onAcceptMapping={handleAcceptMapping}
+      {(() => {
+        switch (currentStep) {
+          case 'error':
+            return <p>{error}</p>;
+          case 'upload':
+            return (
+              <UploadFile
+                file={file}
+                onFileProcessed={handleFileUploaded}
+                onError={handleError}
+              />
+            );
+          case 'process': {
+            if (steps.upload?.fileContent) {
+              return (
+                <FileContentProcessing
+                  fileContent={steps.upload.fileContent}
+                  onFileProcessed={handleFileProcessed}
+                  onError={handleError}
+                />
+              );
+            }
+            return <p>Error in the processing file step</p>;
+          }
+          case 'mapping':
+            if (
+              steps.upload?.fileContent &&
+              steps.upload?.csvData &&
+              steps.process?.formatSignature &&
+              steps.process?.rawTransactions &&
+              steps.process?.rawTransactions.length > 0
+            ) {
+              return (
+                <StepMapping
+                  confidence={steps.process.confidence}
+                  rawContent={steps.upload.fileContent}
+                  csvData={steps.upload.csvData}
+                  initialMapping={steps.process?.mapping || emptyMapping}
+                  rawTransactions={steps.process?.rawTransactions}
+                  formatSignature={steps.process?.formatSignature}
+                  onMappingConfirmed={handleMappingConfirmed}
+                />
+              );
+            }
+            return <p>Error in the mapping step</p>;
+          case 'transactions':
+            if (
+              steps.upload?.fileContent &&
+              steps.upload?.csvData &&
+              steps.process?.formatSignature &&
+              steps.process?.rawTransactions &&
+              steps.process?.rawTransactions.length > 0
+            ) {
+              return (
+                <StepTransactions
+                  transactions={steps.process?.rawTransactions}
+
+                  // confidence={steps.process.confidence}
+                  // rawContent={steps.upload.fileContent}
+                  // csvData={steps.upload.csvData}
+                  // initialMapping={steps.process?.mapping || emptyMapping}
+                  // rawTransactions={steps.process?.rawTransactions}
+                  // formatSignature={steps.process?.formatSignature}
+                  // onMappingConfirmed={handleMappingConfirmed}
+                />
+              );
+            }
+            return <p>Error in the mapping step</p>;
+          case 'learn':
+            return <p>Learn step</p>;
+          case 'complete':
+            return <p>Complete step</p>;
+          default:
+            return <p>Error sequencing steps</p>;
+        }
+      })()}
+
+      {mappingStep === 'reviewTransaction' && (
+        <CSVReviewTransactions
+          parsedTransactions={parsedTransactions}
+          selectedAccount={selectedAccount}
+          onSelectAccount={setSelectedAccount}
+          onToggleTransaction={toggleTransactionSelection}
+          onToggleAllTransactions={toggleAllTransactions}
+          onImport={() => importTransactions(parsedTransactions)}
+          onCancel={onClose}
         />
       )}
-      {renderMappingStep()}
+      {mappingStep === 'importing' && <CSVImporting />}
+      {mappingStep === 'complete' && (
+        <CSVImportComplete importStats={importStats} onClose={onClose} />
+      )}
     </div>
   );
 }

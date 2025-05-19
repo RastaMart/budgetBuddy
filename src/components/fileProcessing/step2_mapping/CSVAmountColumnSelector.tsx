@@ -1,9 +1,8 @@
-import React from 'react';
 import { CSVColumnMapping } from './CSVColumnMapping';
-import { CSVPreview } from '../../types/csv';
+import { CSVData } from '../../../types/csv';
 
 interface CSVAmountColumnSelectorProps {
-  csvPreview: CSVPreview;
+  csvData: CSVData;
   columnMapping: {
     date?: number;
     description?: number;
@@ -15,13 +14,13 @@ interface CSVAmountColumnSelectorProps {
 }
 
 export function CSVAmountColumnSelector({
-  csvPreview,
+  csvData,
   columnMapping,
   onColumnSelect,
 }: CSVAmountColumnSelectorProps) {
   return (
     <CSVColumnMapping
-      csvPreview={csvPreview}
+      csvData={csvData}
       columnMapping={columnMapping}
       onColumnSelect={onColumnSelect}
       title="Select Amount Column"

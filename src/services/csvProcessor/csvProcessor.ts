@@ -83,7 +83,7 @@ export class CsvProcessor {
 
       if (cachedMapping) {
         // Use the cached mapping if available
-        console.log('Use the cached mapping');
+        console.log('Use the cached mapping', csvContent, cachedMapping);
         return {
           formatSignature,
           ...csvMapper.processCsvWithMapping(csvContent, cachedMapping),

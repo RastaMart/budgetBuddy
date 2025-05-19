@@ -28,7 +28,7 @@ export class CsvMapper {
     // Amount detection (could be single amount or separate income/expense)
     const { amountColumn, incomeColumn, expenseColumn } =
       this.findAmountColumns(data, headers);
-
+    console.log({ amountColumn, incomeColumn, expenseColumn });
     if (amountColumn !== undefined) {
       mapping.amount = amountColumn;
     } else {
@@ -1213,7 +1213,7 @@ export class CsvMapper {
     ) {
       return rawTransactions;
     }
-
+    console.log('mapDataToTransactions data', data);
     // Process each row in the CSV data
     for (const row of data) {
       try {
@@ -1235,35 +1235,37 @@ export class CsvMapper {
 
         // Determine transaction amount and type
         let amount = 0;
-        let type: 'income' | 'expense' = 'expense'; // Default to expense
+        let incomeAmount = 0;
+        let expenseAmount = 0;
 
         // Case 1: Single amount column
         if (mapping.amount !== undefined) {
+          console.log('Case 1: Single amount column');
           const amountStr = String(row[headers[mapping.amount]] || '0').trim();
           amount = this.parseAmountValue(amountStr);
 
           // Determine type based on amount sign or type column
           if (mapping.type !== undefined) {
             // Use type column
-            const typeValue = String(row[headers[mapping.type]] || '')
-              .trim()
-              .toLowerCase();
-            type = this.determineTransactionType(typeValue, amount);
+            // const typeValue = String(row[headers[mapping.type]] || '')
+            //   .trim()
+            //   .toLowerCase();
           } else {
             // Use amount sign
-            type = amount >= 0 ? 'income' : 'expense';
             // Make amount positive for expense transactions
             amount = Math.abs(amount);
           }
         }
 
+        // TODO : Fix this, I receive anloy amout, need income and expense
         // Case 2: Separate income and expense columns
         else {
+          console.log('Case 2: Separate income and expense columns', mapping);
           if (mapping.incomeAmount !== undefined) {
             const incomeStr = String(
               row[headers[mapping.incomeAmount]] || '0'
             ).trim();
-            const incomeAmount = this.parseAmountValue(incomeStr);
+            incomeAmount = this.parseAmountValue(incomeStr);
 
             if (incomeAmount > 0) {
               amount = incomeAmount;
@@ -1274,7 +1276,7 @@ export class CsvMapper {
             const expenseStr = String(
               row[headers[mapping.expenseAmount]] || '0'
             ).trim();
-            const expenseAmount = this.parseAmountValue(expenseStr);
+            expenseAmount = this.parseAmountValue(expenseStr);
 
             if (expenseAmount > 0) {
               amount = -expenseAmount;
@@ -1288,6 +1290,8 @@ export class CsvMapper {
             date: formattedDate,
             description,
             amount,
+            incomeAmount: incomeAmount,
+            expenseAmount: expenseAmount,
           });
         }
       } catch (error) {
@@ -1457,7 +1461,7 @@ export class CsvMapper {
   ): CsvProcessResult {
     try {
       const { data } = parse(csvContent, {
-        header: true,
+        //header: true,
         skipEmptyLines: true,
       });
 
