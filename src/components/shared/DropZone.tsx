@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Modal } from './Modal';
-import { CSVImport } from '../transaction/CSVImport';
+import { CSVImport } from '../fileProcessing/CSVImport';
 import { PDFReviewAnalysis } from '../transaction/PDFReviewAnalysis';
 import { Account } from '../../types/account';
 import { Transaction } from '../../types/transaction';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { CSVColumnMapping } from './CSVColumnMapping';
-import { CSVPreview } from '../../types/csv';
+import { CSVPreview } from '../../../types/csv';
 
 interface CSVSplitAmountColumnSelectorProps {
   csvPreview: CSVPreview;

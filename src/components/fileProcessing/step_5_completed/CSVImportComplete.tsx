@@ -1,5 +1,5 @@
 import React from 'react';
-import { ImportError } from '../../types/csv';
+import { ImportError } from '../../../types/csv';
 
 interface CSVImportCompleteProps {
   importStats: {
