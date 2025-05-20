@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
-import { CSVImport } from '../fileProcessing/CSVImport';
-import { PDFReviewAnalysis } from '../transaction/PDFReviewAnalysis';
+import { FileProcessing } from '../fileProcessing/FileProcessing';
+import { PDFReviewAnalysis } from '../transaction/-PDFReviewAnalysis';
 import { DropZoneUI } from './DropZoneUI';
 import { useAuth } from '../../hooks/useContext';
 import { TransactionsImportStats } from '../../types/transaction';
@@ -62,7 +62,7 @@ function DropZone({
             size="full"
           >
             {selectedFile && (
-              <CSVImport
+              <FileProcessing
                 onClose={handleClose}
                 onTransactionsImported={onTransactionsImported}
                 file={selectedFile}
@@ -82,7 +82,7 @@ function DropZone({
             />
           )}
           {selectedFile && (
-            <CSVImport
+            <FileProcessing
               onClose={handleClose}
               onTransactionsImported={onTransactionsImported}
               file={selectedFile}

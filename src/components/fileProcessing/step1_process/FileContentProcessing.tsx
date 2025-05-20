@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import CsvProcessor from '../../../services/csvProcessor/csvProcessor';
+import FileProcessor from '../../../services/csvProcessor/fileProcessor';
 import { useAuth } from '../../../hooks/useContext';
 import { RawTransaction } from '../../../types/transaction';
 import { ColumnMapping } from '../../../types/columnMapping';
@@ -30,7 +30,7 @@ export function FileContentProcessing({
     throw new Error('User not found');
   }
 
-  const csvProcessor = new CsvProcessor();
+  const csvProcessor = new FileProcessor();
   csvProcessor.init(userId);
 
   useEffect(() => {

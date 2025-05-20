@@ -25,17 +25,17 @@ interface Steps {
   learn: boolean | null;
   complete: boolean | null;
 }
-interface CSVImportProps {
+interface FileProcessingProps {
   file: File;
   onClose: () => void;
   onTransactionsImported: (stats: TransactionsImportStats) => void;
 }
 
-export function CSVImport({
+export function FileProcessing({
   file,
   onClose,
   onTransactionsImported,
-}: CSVImportProps) {
+}: FileProcessingProps) {
   const emptyMapping: ColumnMapping = {
     date: undefined,
     description: undefined,
@@ -58,6 +58,12 @@ export function CSVImport({
     setError(error);
   };
   const handleFileUploaded = async (fileContent: string) => {
+    console.log('fileContent', fileContent);
+    // TODO : Check if file is CSV
+    // TODO : Check if file is empty
+    // TODO : Check if file is too big
+    // TODO : Check if file is valid CSV
+    // TODO : Convert ODF to CSV
     const csvData = await readCSVFile(fileContent);
     setSteps((prev) => ({
       ...prev,
@@ -150,68 +156,68 @@ export function CSVImport({
                 onError={handleError}
               />
             );
-          case 'process': {
-            if (steps.upload?.fileContent) {
-              return (
-                <FileContentProcessing
-                  fileContent={steps.upload.fileContent}
-                  onFileProcessed={handleFileProcessed}
-                  onError={handleError}
-                />
-              );
-            }
-            return <p>Error in the processing file step</p>;
-          }
-          case 'mapping':
-            if (
-              steps.upload?.fileContent &&
-              steps.upload?.csvData &&
-              steps.process?.formatSignature &&
-              steps.process?.rawTransactions &&
-              steps.process?.rawTransactions.length > 0
-            ) {
-              return (
-                <StepMapping
-                  confidence={steps.process.confidence}
-                  rawContent={steps.upload.fileContent}
-                  csvData={steps.upload.csvData}
-                  initialMapping={steps.process?.mapping || emptyMapping}
-                  rawTransactions={steps.process?.rawTransactions}
-                  formatSignature={steps.process?.formatSignature}
-                  onMappingConfirmed={handleMappingConfirmed}
-                />
-              );
-            }
-            return <p>Error in the mapping step</p>;
-          case 'transactions':
-            if (
-              steps.upload?.fileContent &&
-              steps.upload?.csvData &&
-              steps.process?.formatSignature &&
-              steps.process?.rawTransactions &&
-              steps.process?.rawTransactions.length > 0
-            ) {
-              return (
-                <StepTransactions
-                  transactions={steps.process?.rawTransactions}
-                  onCancel={handleOnTransactionsCancel}
-                  onImportCompleted={handleImportCompleted}
-                />
-              );
-            }
-            return <p>Error in the mapping step</p>;
-          case 'learn':
-            return <LearningFromTransactionsImport />;
-          case 'complete':
-            if (!steps.transactions?.stats) {
-              return <p>Error in the import step</p>;
-            }
-            return (
-              <ImportTransationsComplete
-                importStats={steps.transactions.stats}
-                onClose={onClose}
-              />
-            );
+          // case 'process': {
+          //   if (steps.upload?.fileContent) {
+          //     return (
+          //       <FileContentProcessing
+          //         fileContent={steps.upload.fileContent}
+          //         onFileProcessed={handleFileProcessed}
+          //         onError={handleError}
+          //       />
+          //     );
+          //   }
+          //   return <p>Error in the processing file step</p>;
+          // }
+          // case 'mapping':
+          //   if (
+          //     steps.upload?.fileContent &&
+          //     steps.upload?.csvData &&
+          //     steps.process?.formatSignature &&
+          //     steps.process?.rawTransactions &&
+          //     steps.process?.rawTransactions.length > 0
+          //   ) {
+          //     return (
+          //       <StepMapping
+          //         confidence={steps.process.confidence}
+          //         rawContent={steps.upload.fileContent}
+          //         csvData={steps.upload.csvData}
+          //         initialMapping={steps.process?.mapping || emptyMapping}
+          //         rawTransactions={steps.process?.rawTransactions}
+          //         formatSignature={steps.process?.formatSignature}
+          //         onMappingConfirmed={handleMappingConfirmed}
+          //       />
+          //     );
+          //   }
+          //   return <p>Error in the mapping step</p>;
+          // case 'transactions':
+          //   if (
+          //     steps.upload?.fileContent &&
+          //     steps.upload?.csvData &&
+          //     steps.process?.formatSignature &&
+          //     steps.process?.rawTransactions &&
+          //     steps.process?.rawTransactions.length > 0
+          //   ) {
+          //     return (
+          //       <StepTransactions
+          //         transactions={steps.process?.rawTransactions}
+          //         onCancel={handleOnTransactionsCancel}
+          //         onImportCompleted={handleImportCompleted}
+          //       />
+          //     );
+          //   }
+          //   return <p>Error in the mapping step</p>;
+          // case 'learn':
+          //   return <LearningFromTransactionsImport />;
+          // case 'complete':
+          //   if (!steps.transactions?.stats) {
+          //     return <p>Error in the import step</p>;
+          //   }
+          //   return (
+          //     <ImportTransationsComplete
+          //       importStats={steps.transactions.stats}
+          //       onClose={onClose}
+          //     />
+          //   );
           default:
             return <p>Error sequencing steps</p>;
         }

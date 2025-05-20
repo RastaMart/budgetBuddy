@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { CsvProcessor } from '../../../services/csvProcessor/csvProcessor';
+import { useEffect, useRef } from 'react';
+import { FileProcessor } from '../../../services/csvProcessor/fileProcessor';
 import { useAuth } from '../../../hooks/useContext';
 
 interface UploadFileProps {
@@ -8,28 +8,27 @@ interface UploadFileProps {
   onError: (error: string) => void;
 }
 
-export function UploadFile({
-  file,
-  onFileProcessed,
-  onError,
-}: UploadFileProps) {
+function UploadFile({ file, onFileProcessed, onError }: UploadFileProps) {
+  const hasRun = useRef(false);
+
   const { userId } = useAuth();
   if (!userId) {
     throw new Error('User not found');
   }
 
-  const csvProcessor = new CsvProcessor();
-  csvProcessor.init(userId);
+  const fileProcessor = new FileProcessor();
+  fileProcessor.init(userId);
 
   useEffect(() => {
-    if (file) {
+    if (!hasRun.current && file) {
+      hasRun.current = true;
       processFile(file);
     }
   }, [file]);
 
   const processFile = async (file: File) => {
     try {
-      const content = await csvProcessor.uploadFile(file);
+      const content = await fileProcessor.uploadFile(file);
       if (content) {
         onFileProcessed(content);
       } else {
@@ -50,3 +49,5 @@ export function UploadFile({
     </div>
   );
 }
+UploadFile.whyDidYouRender = true;
+export { UploadFile };

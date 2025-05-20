@@ -6,7 +6,7 @@ import {
   valueAretheSameMoreThan,
 } from '../../utils/array';
 import Decimal from 'decimal.js';
-import { CsvProcessResult } from './csvProcessor';
+import { FileProcessorResult } from './fileProcessor';
 
 const globalSampleSize = 10;
 
@@ -1454,7 +1454,7 @@ export class CsvMapper {
   processCsvWithMapping(
     csvContent: string,
     mapping: ColumnMapping
-  ): CsvProcessResult {
+  ): FileProcessorResult {
     try {
       const { data } = parse(csvContent, {
         //header: true,

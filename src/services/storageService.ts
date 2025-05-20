@@ -10,38 +10,54 @@ export interface UploadedDocument {
   metadata: Record<string, any>;
 }
 
-export async function uploadCSVFile(
+export async function uploadFile(
   file: File,
   userId: string
 ): Promise<UploadedDocument | null> {
   try {
+    // Determine bucket based on file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+    let bucket = '';
+
+    switch (fileExtension) {
+      case 'csv':
+        bucket = 'csv-uploads';
+        break;
+      case 'pdf':
+        bucket = 'pdf-uploads';
+        break;
+      default:
+        throw new Error(`Unsupported file type: ${fileExtension}`);
+    }
+
     // Calculate file hash
     const buffer = await file.arrayBuffer();
     const wordArray = WordArray.create(new Uint8Array(buffer));
     const hash = sha256(wordArray).toString(Hex);
 
-    // Check if file already exists - using limit(1) instead of single()
-    const { data: existingDocs } = await supabase
+    // Check if file already exists
+    const { data: existingDocs, error: queryError } = await supabase
       .from('user_documents')
       .select('*')
       .eq('user_id', userId)
       .eq('file_hash', hash)
       .limit(1);
 
+    if (queryError) {
+      console.error('Error checking for existing document:', queryError);
+      throw queryError;
+    }
+
     // If we found an existing document, return it
     if (existingDocs && existingDocs.length > 0) {
       return existingDocs[0];
     }
 
-    // Skip bucket creation as it requires admin privileges
-    // Regular users can't create buckets due to RLS policies
-    // The bucket should be created by an admin beforehand
-
     // Upload file to storage
     const filePath = `${userId}/${hash}-${file.name}`;
     try {
       const { error: uploadError } = await supabase.storage
-        .from('csv-uploads')
+        .from(bucket)
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false,
@@ -62,7 +78,7 @@ export async function uploadCSVFile(
           uploadError.message.includes('not found')
         ) {
           console.error(
-            'The csv-uploads bucket does not exist. An admin needs to create it.'
+            `The ${bucket} bucket does not exist. An admin needs to create it.`
           );
         }
         throw uploadError;
@@ -114,116 +130,23 @@ export async function uploadCSVFile(
   }
 }
 
-export async function uploadPDFFile(
-  file: File,
-  userId: string
-): Promise<UploadedDocument | null> {
+export async function getFileContent(filePath: string): Promise<string | null> {
   try {
-    // Calculate file hash
-    const buffer = await file.arrayBuffer();
-    const wordArray = WordArray.create(new Uint8Array(buffer));
-    const hash = sha256(wordArray).toString(Hex);
+    // Extract the file type from the path
+    const extension = filePath.split('.').pop()?.toLowerCase() || '';
+    let type: string;
 
-    // Check if file already exists - using single() for exact match
-    const { data: existingDoc, error: queryError } = await supabase
-      .from('user_documents')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('file_hash', hash)
-      .maybeSingle();
-
-    if (queryError) {
-      console.error('Error checking for existing document:', queryError);
-      throw queryError;
+    switch (extension) {
+      case 'csv':
+        type = 'csv';
+        break;
+      case 'pdf':
+        type = 'pdf';
+        break;
+      default:
+        throw new Error(`Unsupported file type: ${extension}`);
     }
-
-    // If we found an existing document, return it immediately
-    if (existingDoc) {
-      console.log(`Found existing document, returning:`, existingDoc);
-      return existingDoc;
-    }
-
-    // Upload file to storage only if it doesn't exist
-    const filePath = `${userId}/${hash}-${file.name}`;
-    try {
-      const { error: uploadError } = await supabase.storage
-        .from('pdf-uploads')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error('PDF upload error details:', {
-          message: uploadError.message,
-          status: uploadError.status,
-          details: uploadError.details,
-          hint: uploadError.hint,
-          code: uploadError.code,
-        });
-
-        if (
-          uploadError.message.includes('bucket') &&
-          uploadError.message.includes('not found')
-        ) {
-          console.error(
-            'The pdf-uploads bucket does not exist. An admin needs to create it.'
-          );
-        }
-        throw uploadError;
-      }
-    } catch (storageError) {
-      console.error('Storage operation failed:', storageError);
-      throw storageError;
-    }
-
-    // Create document record
-    try {
-      const { data: document, error: docError } = await supabase
-        .from('user_documents')
-        .insert({
-          user_id: userId,
-          file_name: file.name,
-          file_hash: hash,
-          file_path: filePath,
-          metadata: {
-            size: file.size,
-            type: file.type,
-            lastModified: file.lastModified,
-          },
-        })
-        .select()
-        .single();
-
-      if (docError) {
-        console.error('Document creation error details:', {
-          message: docError.message,
-          details: docError.details,
-          hint: docError.hint,
-          code: docError.code,
-        });
-        throw docError;
-      }
-      return document;
-    } catch (dbError) {
-      console.error('Database operation failed:', dbError);
-      throw dbError;
-    }
-  } catch (error) {
-    console.error('Error uploading PDF file:', error);
-    if (error instanceof Error) {
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-    }
-    return null;
-  }
-}
-
-export async function getFileContent(
-  type: 'csv' | 'pdf',
-  filePath: string
-): Promise<string | null> {
-  try {
+    console.log(type, filePath);
     const { data, error } = await supabase.storage
       .from(type + '-uploads')
       .download(filePath);
