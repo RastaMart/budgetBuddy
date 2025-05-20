@@ -1,21 +1,12 @@
 import { useState } from 'react';
 import { ColumnMapping } from '../../../types/columnMapping';
-import { CSVData, CSVTransaction } from '../../../types/csv';
+import { CSVData } from '../../../types/csv';
 import { RawTransaction } from '../../../types/transaction';
-import { CSVAmountColumnSelector } from './CSVAmountColumnSelector';
-import { CSVAmountTypeSelector } from './CSVAmountTypeSelector';
-import { CSVDateColumnSelector } from './CSVDateColumnSelector';
-import { CSVDescriptionColumnSelector } from './CSVDescriptionColumnSelector';
-import { CSVReviewMapping } from './CSVReviewMapping';
-import { CSVSplitAmountColumnSelector } from './CSVSplitAmountColumnSelector';
-import { previousDay } from 'date-fns';
-import {
-  cleanAmount,
-  cleanDescription,
-  parseDate,
-} from '../../../utils/dataParser';
+import { AmountTypeSelector } from './AmountTypeSelector';
+import { ReviewMapping } from './ReviewMapping';
 import { formatCache } from '../../../services/csvProcessor/formatCache';
 import { useAuth } from '../../../hooks/useContext';
+import { ColumnMappingSelector } from './ColumnMappingSelector';
 
 interface StepMappingProps {
   confidence: number;
@@ -109,7 +100,6 @@ export const StepMapping = ({
   };
 
   const handleAmountTypeSelection = (singleColumn: boolean) => {
-    setIsSingleAmountColumn(singleColumn);
     setMappingStep(singleColumn ? 'amount' : 'amount-split');
   };
 
@@ -135,45 +125,59 @@ export const StepMapping = ({
   switch (mappingStep) {
     case 'date':
       return (
-        <CSVDateColumnSelector
+        <ColumnMappingSelector
           csvData={csvData}
-          columnMapping={initialMapping}
+          columnMapping={mapping}
           onColumnSelect={handleColumnSelect}
+          title="Select Date Column"
+          description="Click on the column header or any cell in the column that contains transaction dates"
         />
       );
     case 'description':
       return (
-        <CSVDescriptionColumnSelector
+        <ColumnMappingSelector
           csvData={csvData}
-          columnMapping={initialMapping}
+          columnMapping={mapping}
           onColumnSelect={handleColumnSelect}
+          title="Select Description Column"
+          description="Click on the column header or any cell in the column that contains transaction descriptions"
         />
       );
     case 'amount-type':
       return (
-        <CSVAmountTypeSelector
-          onAmountTypeSelection={handleAmountTypeSelection}
-        />
+        <AmountTypeSelector onAmountTypeSelection={handleAmountTypeSelection} />
       );
     case 'amount':
       return (
-        <CSVAmountColumnSelector
+        <ColumnMappingSelector
           csvData={csvData}
-          columnMapping={initialMapping}
+          columnMapping={mapping}
           onColumnSelect={handleColumnSelect}
+          title="Select Amount Column"
+          description="Click on the column header or any cell in the column that contains transaction amounts"
         />
       );
     case 'amount-split':
       return (
-        <CSVSplitAmountColumnSelector
+        <ColumnMappingSelector
           csvData={csvData}
-          columnMapping={initialMapping}
+          columnMapping={mapping}
           onColumnSelect={handleColumnSelect}
+          title={
+            mapping.expenseAmount
+              ? 'Select Deposit Column'
+              : 'Select Spending Column'
+          }
+          description={
+            mapping.expenseAmount
+              ? 'Click on the column header or any cell in the column that contains deposit amounts'
+              : 'Click on the column header or any cell in the column that contains spending amounts'
+          }
         />
       );
     case 'reviewMapping':
       return (
-        <CSVReviewMapping
+        <ReviewMapping
           rawTransactions={rawTransactions}
           rawContent={rawContent}
           onRefuseMap={handleRefuseMapping}

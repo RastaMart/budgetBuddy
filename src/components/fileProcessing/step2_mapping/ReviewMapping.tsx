@@ -1,21 +1,21 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
-import { RawTransaction } from '../../types/transaction';
-import { ColumnMapping } from '../../types/columnMapping';
+import { RawTransaction } from '../../../types/transaction';
+import { ColumnMapping } from '../../../types/columnMapping';
 
-interface CCSVReviewMappingProps {
+interface ReviewMappingProps {
   rawTransactions: RawTransaction[];
   rawContent: string;
   onRefuseMap: () => void;
   onAcceptMapping: (columnMapping: ColumnMapping) => void;
 }
 
-export function CSVReviewMapping({
+export function ReviewMapping({
   rawTransactions,
   rawContent,
   onRefuseMap,
   onAcceptMapping,
-}: CCSVReviewMappingProps) {
+}: ReviewMappingProps) {
   // const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>({});
 
   // Get 3 random transactions for preview

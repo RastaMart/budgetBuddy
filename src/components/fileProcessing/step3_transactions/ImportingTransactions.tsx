@@ -8,18 +8,18 @@ import {
   TransactionsImportStats,
 } from '../../../types/transaction';
 
-interface ImportDataProps {
+interface ImportingTransactionsProps {
   transactions: RawTransaction[];
   inAccountId: string;
   forDocumentId: string | null;
   onImportCompleted: (stats: TransactionsImportStats) => void;
 }
-export function CSVImporting({
+export function ImportingTransactions({
   transactions,
   inAccountId,
   forDocumentId,
   onImportCompleted,
-}: ImportDataProps) {
+}: ImportingTransactionsProps) {
   const { userId } = useAuth();
   if (!userId) throw new Error('User not found');
   if (!inAccountId) throw new Error('Account ID not found');

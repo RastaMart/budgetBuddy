@@ -1,12 +1,10 @@
-import React from 'react';
-
-interface CSVAmountTypeSelectorProps {
+interface AmountTypeSelectorProps {
   onAmountTypeSelection: (singleColumn: boolean) => void;
 }
 
-export function CSVAmountTypeSelector({
+export function AmountTypeSelector({
   onAmountTypeSelection,
-}: CSVAmountTypeSelectorProps) {
+}: AmountTypeSelectorProps) {
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <h3 className="text-lg font-medium text-gray-900">

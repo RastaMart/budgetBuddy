@@ -3,7 +3,7 @@ import { Amount } from '../../shared/Amount';
 import { useAccounts } from '../../../hooks/useAccounts';
 import { RawTransaction } from '../../../types/transaction';
 
-interface CSVReviewTransactionsProps {
+interface ReviewTransactionsProps {
   transactions: RawTransaction[];
   selectedAccount: string | null;
   onSelectAccount: (accountId: string) => void;
@@ -13,7 +13,7 @@ interface CSVReviewTransactionsProps {
   onCancel?: () => void;
 }
 
-export function CSVReviewTransactions({
+export function ReviewTransactions({
   transactions,
   selectedAccount,
   onSelectAccount,
@@ -21,7 +21,7 @@ export function CSVReviewTransactions({
   onToggleAllTransactions,
   onImport,
   onCancel,
-}: CSVReviewTransactionsProps) {
+}: ReviewTransactionsProps) {
   const { accounts } = useAccounts();
 
   const handleSelectAccount = (e: { target: { value: string } }) => {

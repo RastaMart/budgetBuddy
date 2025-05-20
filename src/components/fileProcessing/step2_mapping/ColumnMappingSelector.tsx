@@ -1,7 +1,7 @@
 import { ColumnMapping } from '../../../types/columnMapping';
 import { CSVData } from '../../../types/csv';
 
-interface ColumnMappingProps {
+interface ColumnMappingSelectorProps {
   csvData: CSVData;
   columnMapping: ColumnMapping;
   onColumnSelect: (columnIndex: number) => void;
@@ -9,13 +9,13 @@ interface ColumnMappingProps {
   description: string;
 }
 
-export function CSVColumnMapping({
+export function ColumnMappingSelector({
   csvData,
   columnMapping,
   onColumnSelect,
   title,
   description,
-}: ColumnMappingProps) {
+}: ColumnMappingSelectorProps) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg shadow">

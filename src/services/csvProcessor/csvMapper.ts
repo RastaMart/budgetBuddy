@@ -1257,7 +1257,6 @@ export class CsvMapper {
         // TODO : Fix this, I receive anloy amout, need income and expense
         // Case 2: Separate income and expense columns
         else {
-          console.log('Case 2: Separate income and expense columns', mapping);
           if (mapping.incomeAmount !== undefined) {
             const incomeStr = String(
               row[headers[mapping.incomeAmount]] || '0'

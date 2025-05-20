@@ -139,7 +139,7 @@ export async function uploadPDFFile(
 
     // If we found an existing document, return it immediately
     if (existingDoc) {
-      console.log('Found existing document, returning:', existingDoc);
+      console.log(`Found existing document, returning:`, existingDoc);
       return existingDoc;
     }
 

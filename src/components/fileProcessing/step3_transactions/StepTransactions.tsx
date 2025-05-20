@@ -5,8 +5,8 @@ import {
   RawTransaction,
   TransactionsImportStats,
 } from '../../../types/transaction';
-import { CSVReviewTransactions } from './CSVReviewTransactions';
-import { CSVImporting } from './CSVImporting';
+import { ReviewTransactions } from './ReviewTransactions';
+import { ImportingTransactions } from './ImportingTransactions';
 
 interface StepTransactionsProps {
   transactions: RawTransaction[];
@@ -91,7 +91,7 @@ export default function StepTransactions({
         switch (transactionsSteps) {
           case 'review':
             return (
-              <CSVReviewTransactions
+              <ReviewTransactions
                 transactions={parsedTransactions}
                 selectedAccount={selectedAccount}
                 onSelectAccount={handleSelectAccount}
@@ -107,7 +107,7 @@ export default function StepTransactions({
               return null;
             }
             return (
-              <CSVImporting
+              <ImportingTransactions
                 transactions={parsedTransactions}
                 inAccountId={selectedAccount}
                 forDocumentId={null}

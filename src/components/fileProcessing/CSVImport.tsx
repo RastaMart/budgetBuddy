@@ -9,7 +9,8 @@ import { ColumnMapping } from '../../types/columnMapping';
 import { UploadFile } from './step0_upload/UploadFile';
 import { StepMapping } from './step2_mapping/StepMapping';
 import StepTransactions from './step3_transactions/StepTransactions';
-import { CSVImportComplete } from './step5_completed/CSVImportComplete';
+import { ImportTransationsComplete } from './step5_completed/ImportTransationsComplete';
+import { LearningFromTransactionsImport } from './step4_learn/LearningFromTransactionsImport';
 
 interface Steps {
   upload: {
@@ -200,13 +201,13 @@ export function CSVImport({
             }
             return <p>Error in the mapping step</p>;
           case 'learn':
-            return <p>Learn step</p>;
+            return <LearningFromTransactionsImport />;
           case 'complete':
             if (!steps.transactions?.stats) {
               return <p>Error in the import step</p>;
             }
             return (
-              <CSVImportComplete
+              <ImportTransationsComplete
                 importStats={steps.transactions.stats}
                 onClose={onClose}
               />

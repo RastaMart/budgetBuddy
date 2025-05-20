@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (existingProfile) {
         setProfile(existingProfile);
       } else {
-        console.log('Profile not found, creating a new one...');
+        console.log(`Profile not found, creating a new one...`);
         // Profile doesn't exist, create it
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')

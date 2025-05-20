@@ -74,16 +74,13 @@ export class CsvProcessor {
     }
     try {
       // 1. Generate a format signature for this CSV
-      console.log('1. Generate a format signature for this CSV');
       const formatSignature = this.generateFormatSignature(csvContent);
 
       // 2. Check cache for known format
-      console.log('2. Check cache for known format');
       const cachedMapping = await formatCache.getFormat(formatSignature);
 
       if (cachedMapping) {
         // Use the cached mapping if available
-        console.log('Use the cached mapping', csvContent, cachedMapping);
         return {
           formatSignature,
           ...csvMapper.processCsvWithMapping(csvContent, cachedMapping),
@@ -91,7 +88,6 @@ export class CsvProcessor {
       }
 
       // 3. If no cached mapping, detect columns using heuristics
-      console.log('3. If no cached mapping, detect columns using heuristics');
 
       const { data } = parse(csvContent, {
         //header: true,
@@ -110,7 +106,6 @@ export class CsvProcessor {
       const confidence = csvMapper.calculateMappingConfidence(mapping);
 
       // 4. Process the data with the detected mapping
-      console.log('4. Process the data with the detected mapping');
       const rawTransactions = csvMapper.mapDataToTransactions(data, mapping);
 
       return {

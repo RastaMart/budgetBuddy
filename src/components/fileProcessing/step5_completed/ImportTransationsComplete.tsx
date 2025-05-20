@@ -1,14 +1,14 @@
 import { TransactionsImportStats } from '../../../types/transaction';
 
-interface CSVImportCompleteProps {
+interface ImportTransationsCompleteProps {
   importStats: TransactionsImportStats;
   onClose?: () => void;
 }
 
-export function CSVImportComplete({
+export function ImportTransationsComplete({
   importStats,
   onClose,
-}: CSVImportCompleteProps) {
+}: ImportTransationsCompleteProps) {
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="p-6">
