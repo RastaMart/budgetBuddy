@@ -50,14 +50,7 @@ export function FileContentProcessing({
         confidence,
         errorMessage,
       } = await csvProcessor.processCSV(fileContent);
-      console.log('processFileContent', {
-        success,
-        rawTransactions,
-        mapping,
-        formatSignature,
-        confidence,
-        errorMessage,
-      });
+
       if (!success && errorMessage) {
         onError('Error processing file : ' + errorMessage);
         return;

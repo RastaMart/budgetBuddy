@@ -19,13 +19,14 @@ function DropZoneUI({
 
   const onDrop = useCallback(
     (dropFiles: File[]) => {
-      console.log('DropZoneUI onDrop', dropFiles);
+      console.log('dropFiles', dropFiles);
       const files = dropFiles.filter((file) => {
         const fileExtension = file.name.split('.').pop()?.toLowerCase();
         return acceptedFileTypes
           .map((type: String) => type.replace('.', '').toLowerCase())
           .includes(fileExtension || '');
       });
+      console.log('files', files);
       onFileDrop(files);
     },
     [acceptedFileTypes]

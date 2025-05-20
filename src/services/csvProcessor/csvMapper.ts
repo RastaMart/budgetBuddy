@@ -28,7 +28,6 @@ export class CsvMapper {
     // Amount detection (could be single amount or separate income/expense)
     const { amountColumn, incomeColumn, expenseColumn } =
       this.findAmountColumns(data, headers);
-    console.log({ amountColumn, incomeColumn, expenseColumn });
     if (amountColumn !== undefined) {
       mapping.amount = amountColumn;
     } else {
@@ -1213,7 +1212,6 @@ export class CsvMapper {
     ) {
       return rawTransactions;
     }
-    console.log('mapDataToTransactions data', data);
     // Process each row in the CSV data
     for (const row of data) {
       try {
@@ -1240,7 +1238,6 @@ export class CsvMapper {
 
         // Case 1: Single amount column
         if (mapping.amount !== undefined) {
-          console.log('Case 1: Single amount column');
           const amountStr = String(row[headers[mapping.amount]] || '0').trim();
           amount = this.parseAmountValue(amountStr);
 
@@ -1466,7 +1463,6 @@ export class CsvMapper {
       });
 
       const transactions = this.mapDataToTransactions(data, mapping);
-      console.log('processCsvWithMapping transactions', transactions);
       return {
         success: true,
         rawTransactions: transactions,

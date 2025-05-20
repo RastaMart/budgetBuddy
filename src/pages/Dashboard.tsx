@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useContext';
-import { useAccounts } from '../hooks/useAccounts';
 import { FileProcessor } from '../components/transaction/FileProcessor';
-import { Transaction } from '../types/transaction';
+import { Transaction, TransactionsImportStats } from '../types/transaction';
+import { DropZone } from '../components/shared/DropZone';
 
 function Dashboard() {
   const { userId } = useAuth();
-  const { accounts } = useAccounts();
+
   const [categoryCount, setCategoryCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
     []
   );
   if (!userId) {
-    console.log('No user found');
+    console.error('No user found');
     return <div>Please log in to view your dashboard.</div>;
   }
   useEffect(() => {
@@ -38,19 +38,17 @@ function Dashboard() {
     checkSupabaseConnection();
   }, [userId]);
 
-  const handleTransactionsLoaded = (transactions: Transaction[]) => {
+  const handleTransactionsLoaded = (stats: TransactionsImportStats) => {
     // Update recent transactions in state
-    // setRecentTransactions((current) => [...transactions, ...current]);
-
-    // You could also trigger other actions when transactions are loaded
-    console.log(`${transactions.length} transactions loaded`);
+    setRecentTransactions((current) => [...stats.imported, ...current]);
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
 
-      <FileProcessor />
+      {/* <FileProcessor onTransactionsImported={handleTransactionsLoaded} /> */}
+      <DropZone inModal onTransactionsImported={handleTransactionsLoaded} />
 
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">
@@ -70,7 +68,7 @@ function Dashboard() {
         )}
       </div>
 
-      {/* {recentTransactions.length > 0 && (
+      {recentTransactions.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">
             Recently Imported Transactions
@@ -80,7 +78,7 @@ function Dashboard() {
             {recentTransactions.length !== 1 ? 's' : ''} imported
           </p>
         </div>
-      )} */}
+      )}
     </div>
   );
 }

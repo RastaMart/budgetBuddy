@@ -1,16 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../hooks/useContext';
 import { supabase } from '../../../lib/supabase';
-import { RawTransaction } from '../../../types/transaction';
+import {
+  RawTransaction,
+  TransactionsImportStats,
+} from '../../../types/transaction';
 import { CSVReviewTransactions } from './CSVReviewTransactions';
-import { parseDate } from '../../../utils/dataParser';
+import { CSVImporting } from './CSVImporting';
 
 interface StepTransactionsProps {
   transactions: RawTransaction[];
+  onCancel: () => void;
+  onImportCompleted: (stats: TransactionsImportStats) => void;
 }
 
-export default function stepTransactions({
+export default function StepTransactions({
   transactions,
+  onCancel,
+  onImportCompleted,
 }: StepTransactionsProps) {
   const { userId } = useAuth();
   if (!userId) throw new Error('User not found');
@@ -19,6 +26,9 @@ export default function stepTransactions({
     RawTransaction[]
   >([]);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [transactionsSteps, setTransactionsSteps] = useState<
+    'review' | 'import'
+  >('review');
 
   useEffect(() => {
     async function doit() {
@@ -38,12 +48,7 @@ export default function stepTransactions({
           .eq('date', transaction.date)
           .eq('description', transaction.description)
           .eq('amount', transaction.amount.toString());
-        // console.log('data', data, {
-        //   userId,
-        //   date: transaction.date,
-        //   description: transaction.description,
-        //   amount: transaction.amount,
-        // });
+
         return {
           ...transaction,
           isDuplicate: (data?.length || 0) > 0,
@@ -70,25 +75,48 @@ export default function stepTransactions({
     setSelectedAccount(accountId);
   };
   const handleCancel = () => {
-    console.log('cancel');
-    console.warn('cancel');
+    onCancel();
+    setTransactionsSteps('review');
   };
   const handleImport = () => {
-    const selectedTransactions = parsedTransactions.filter((t) => t.selected);
-    console.log('TODO import selectedTransactions', selectedTransactions);
+    setTransactionsSteps('import');
+  };
+  const handleImportCompleted = (stats: TransactionsImportStats) => {
+    onImportCompleted(stats);
   };
 
   return (
     <>
-      <CSVReviewTransactions
-        transactions={parsedTransactions}
-        selectedAccount={selectedAccount}
-        onSelectAccount={handleSelectAccount}
-        onToggleTransaction={handleToggleTransaction}
-        onToggleAllTransactions={handleToggleAllTransactions}
-        onCancel={handleCancel}
-        onImport={handleImport}
-      />
+      {(() => {
+        switch (transactionsSteps) {
+          case 'review':
+            return (
+              <CSVReviewTransactions
+                transactions={parsedTransactions}
+                selectedAccount={selectedAccount}
+                onSelectAccount={handleSelectAccount}
+                onToggleTransaction={handleToggleTransaction}
+                onToggleAllTransactions={handleToggleAllTransactions}
+                onCancel={handleCancel}
+                onImport={handleImport}
+              />
+            );
+          case 'import': {
+            if (!selectedAccount) {
+              console.error('No account selected');
+              return null;
+            }
+            return (
+              <CSVImporting
+                transactions={parsedTransactions}
+                inAccountId={selectedAccount}
+                forDocumentId={null}
+                onImportCompleted={handleImportCompleted}
+              />
+            );
+          }
+        }
+      })()}
     </>
   );
 }

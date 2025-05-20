@@ -143,18 +143,13 @@ export class CsvProcessor {
     // Create a signature based on headers and data structure
     const headerSignature = meta.fields?.join('|') || '';
     const structureSignature =
-      data.length > 0 ? Object.values(data[0]).join('|') : '';
-    console.log(
-      'generateFormatSignature',
-      'headerSignature',
-      headerSignature,
-      'structureSignature',
-      structureSignature
-    );
+      data.length > 0 && typeof data[0] === 'object' && data[0] !== null
+        ? Object.values(data[0] as Record<string, unknown>).join('|')
+        : '';
+
     // Calculate file hash
     const hash = CryptoJS.SHA256(headerSignature + structureSignature);
     const signature = hash.toString(CryptoJS.enc.Hex).substring(0, 20);
-    console.log('generateFormatSignature', 'signature', signature);
     return signature;
   }
 }

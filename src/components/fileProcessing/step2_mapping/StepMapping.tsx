@@ -41,9 +41,7 @@ export const StepMapping = ({
     console.error('User not found');
     return null;
   }
-  console.log('StepMapping', {
-    confidence,
-  });
+
   let initialStep: 'reviewMapping' | 'date' = 'date';
   if (confidence > 0.95) {
     onMappingConfirmed(initialMapping);
@@ -128,13 +126,7 @@ export const StepMapping = ({
     });
     setMappingStep('date');
   };
-  const handleAcceptMapping = async (
-    newMapping: ColumnMapping,
-    csvData?: CSVData
-  ) => {
-    console.log('handleAcceptMapping', formatSignature, newMapping, csvData);
-    console.log('set newMapping', newMapping);
-
+  const handleAcceptMapping = async (newMapping: ColumnMapping) => {
     setMapping(newMapping);
     await formatCache.saveFormat(formatSignature, newMapping, userId);
     onMappingConfirmed(newMapping);

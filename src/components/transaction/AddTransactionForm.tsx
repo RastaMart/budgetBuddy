@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { Transaction } from '../../types/transaction';
+import { Transaction, TransactionsImportStats } from '../../types/transaction';
 import { Category } from '../../types/category';
 import { Account } from '../../types/account';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useContext';
 import { FileProcessor } from './FileProcessor';
+import { DropZone } from '../shared/DropZone';
 
 interface FormData {
   category_id?: string;
@@ -124,10 +125,10 @@ export function AddTransactionForm({
     onSubmit(e);
   };
 
-  const handleBulkImport = async (transactions: Transaction[]) => {
+  const handleBulkImport = async (stats: TransactionsImportStats) => {
     // Check rules for each transaction
     const processedTransactions = await Promise.all(
-      transactions.map(async (transaction) => {
+      stats.imported.map(async (transaction) => {
         const { data: t, error } = await supabase
           .from('transactions')
           .select('category_id')
@@ -369,11 +370,8 @@ export function AddTransactionForm({
 
       {activeTab === 'bulk' && !isEditing && (
         <div className="space-y-6">
-          <FileProcessor
-            onTransactionsLoaded={handleBulkImport}
-            accounts={accounts}
-            acceptedFileTypes={['.csv', '.pdf']}
-          />
+          {/* <FileProcessor onTransactionsImported={handleBulkImport} /> */}
+          <DropZone onTransactionsImported={handleBulkImport} />
         </div>
       )}
     </div>

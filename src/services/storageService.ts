@@ -179,17 +179,6 @@ export async function uploadPDFFile(
 
     // Create document record
     try {
-      console.log({
-        userId,
-        file_name: file.name,
-        file_hash: hash,
-        file_path: filePath,
-        metadata: {
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified,
-        },
-      });
       const { data: document, error: docError } = await supabase
         .from('user_documents')
         .insert({
@@ -270,11 +259,10 @@ async function handleFileEncoding(blob: Blob): Promise<string> {
 
       // If text contains French characters and they look correct, return it
       if (text.match(/[àáâäæãåāéèêëêìíîïîòóôöõøùúûüñç]/i)) {
-        console.log(`Successfully decoded with ${encoding}`);
         return text;
       }
     } catch (e) {
-      console.log(`Failed to decode with ${encoding}:`, e);
+      console.error(`Failed to decode with ${encoding}:`, e);
       // Continue to next encoding
     }
   }

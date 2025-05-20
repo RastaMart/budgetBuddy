@@ -75,7 +75,6 @@ class FormatCache {
     columnMapping: ColumnMapping,
     userId: string
   ): Promise<boolean> {
-    console.log('saveFormat', formatSignature, columnMapping, userId);
     try {
       // Check if this format signature already exists
       const existingFormat = await this.getFormat(formatSignature);

@@ -1,111 +1,97 @@
-import React, { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Modal } from './Modal';
 import { CSVImport } from '../fileProcessing/CSVImport';
 import { PDFReviewAnalysis } from '../transaction/PDFReviewAnalysis';
-import { Account } from '../../types/account';
-import { Transaction } from '../../types/transaction';
 import { DropZoneUI } from './DropZoneUI';
-import { uploadCSVFile } from '../../services/storageService';
 import { useAuth } from '../../hooks/useContext';
+import { TransactionsImportStats } from '../../types/transaction';
+
+const acceptedFileTypes = ['csv', 'pdf'];
+const maxSize = 5242880; // 5MB
 
 interface DropZoneProps {
-  onFileProcessed?: (data: any) => void;
-  acceptedFileTypes?: string[];
-  maxSize?: number;
   className?: string;
-  children?: React.ReactNode;
-  onTransactionsLoaded?: (transactions: Transaction[]) => void;
+  inModal?: boolean;
+  onTransactionsImported: (stats: TransactionsImportStats) => void;
 }
 
 function DropZone({
-  onFileProcessed,
-  acceptedFileTypes = ['.csv', '.pdf'],
-  maxSize = 5242880, // 5MB
   className = '',
-  onTransactionsLoaded = () => {},
+  inModal = false,
+  onTransactionsImported,
 }: DropZoneProps) {
-  // console.log('DropZone', acceptedFileTypes, maxSize, className);
   const { userId } = useAuth();
   if (!userId) {
     console.error('DropZone: userId is not defined');
     return null;
   }
-  const [showCSVModal, setShowCSVModal] = useState(false);
-  const [showPDFModal, setShowPDFModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  // const [selectedFiles, setSelectedFiles] = useState<File | null>(null);
 
   const handleDropFiles = (files: File[]) => {
-    console.log('DropZone onDrop', files);
-    // const file = files[0];
     if (!files || files.length === 0) return;
     handleFileProcess(files[0]);
     // TODO support list
     // files.forEach((file) => {
-    //   console.log('onDrop handleFileProcess', file);
     //   handleFileProcess(file);
     // });
   };
 
   const handleFileProcess = async (file: File) => {
-    console.log('handleFileProcess', file);
     setSelectedFile(file);
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-
-    if (fileExtension === 'csv') {
-      setShowCSVModal(true);
-    } else if (fileExtension === 'pdf') {
-      setShowPDFModal(true);
-    }
   };
 
   const handleClose = () => {
-    setShowCSVModal(false);
-    setShowPDFModal(false);
     setSelectedFile(null);
   };
 
-  const handleCSVTransactionsLoaded = (transactions: Transaction[]) => {
-    onTransactionsLoaded(transactions);
-    if (onFileProcessed) {
-      onFileProcessed({ type: 'csv', data: transactions });
-    }
-  };
-
-  const handlePDFAccept = (data: any) => {
-    if (onFileProcessed) {
-      onFileProcessed({ type: 'pdf', data });
-    }
-    handleClose();
-  };
-  // const showCSVModal = !!(selectedFile && selectedFile.name.endsWith('.csv'));
-  // const showPDFModal = !!(selectedFile && selectedFile.name.endsWith('.pdf'));
   return (
     <>
-      <DropZoneUI
-        acceptedFileTypes={acceptedFileTypes}
-        maxSize={maxSize}
-        className={className}
-        onFileDrop={handleDropFiles}
-      />
-
-      {/* CSV Import Modal */}
-      <Modal
-        title="Import Transactions"
-        isOpen={showCSVModal}
-        onClose={handleClose}
-        size="full"
-      >
-        {showCSVModal && selectedFile && (
-          <CSVImport
-            onTransactionsLoaded={handleCSVTransactionsLoaded}
-            onClose={handleClose}
-            file={selectedFile}
+      {/* Import Modal */}
+      {inModal && (
+        <>
+          <DropZoneUI
+            acceptedFileTypes={acceptedFileTypes}
+            maxSize={maxSize}
+            className={className}
+            onFileDrop={handleDropFiles}
           />
-        )}
-      </Modal>
+          <Modal
+            title="Import Transactions"
+            isOpen={selectedFile !== null}
+            onClose={handleClose}
+            size="full"
+          >
+            {selectedFile && (
+              <CSVImport
+                onClose={handleClose}
+                onTransactionsImported={onTransactionsImported}
+                file={selectedFile}
+              />
+            )}
+          </Modal>
+        </>
+      )}
+      {!inModal && (
+        <>
+          {!selectedFile && (
+            <DropZoneUI
+              acceptedFileTypes={acceptedFileTypes}
+              maxSize={maxSize}
+              className={className}
+              onFileDrop={handleDropFiles}
+            />
+          )}
+          {selectedFile && (
+            <CSVImport
+              onClose={handleClose}
+              onTransactionsImported={onTransactionsImported}
+              file={selectedFile}
+            />
+          )}
+        </>
+      )}
 
-      {/* PDF Analysis Modal */}
+      {/* PDF Analysis Modal
       <Modal
         title="Review PDF Analysis"
         isOpen={showPDFModal}
@@ -114,12 +100,12 @@ function DropZone({
       >
         {showPDFModal && selectedFile && (
           <PDFReviewAnalysis
-            file={selectedFile}
+            pdfFile={selectedFile}
             onClose={handleClose}
-            onAccept={handlePDFAccept}
+            onAccept={handleClose}
           />
         )}
-      </Modal>
+      </Modal> */}
     </>
   );
 }

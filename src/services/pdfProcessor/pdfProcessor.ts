@@ -19,7 +19,6 @@ export class PdfProcessor {
   }
 
   async uploadFile(file: File): Promise<string | null> {
-    console.log('uploadFile');
     if (!this.userId) {
       console.error('File or user ID is not set');
       return null;

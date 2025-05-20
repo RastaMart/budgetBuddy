@@ -2,7 +2,6 @@
  * Uploads a file to the server
  */
 export async function uploadFile(file: File): Promise<string> {
-  console.log('uploadFile', file.name);
   // This is a placeholder for actual file upload functionality
   // In a real app, you would upload to your backend or cloud storage
 
@@ -26,7 +25,6 @@ export async function uploadFile(file: File): Promise<string> {
  * Handles different file types
  */
 export function processFile(file: File): Promise<any> {
-  console.log('processFile', file.name);
   const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
   if (fileExtension === 'csv') {

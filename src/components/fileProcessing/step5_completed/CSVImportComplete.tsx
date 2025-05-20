@@ -1,13 +1,7 @@
-import React from 'react';
-import { ImportError } from '../../../types/csv';
+import { TransactionsImportStats } from '../../../types/transaction';
 
 interface CSVImportCompleteProps {
-  importStats: {
-    total: number;
-    successful: number;
-    failed: number;
-    errors: ImportError[];
-  };
+  importStats: TransactionsImportStats;
   onClose?: () => void;
 }
 

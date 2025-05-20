@@ -58,3 +58,11 @@ export interface TransactionsImportError {
   error: string;
   data: RawTransaction;
 }
+export interface TransactionsImportStats {
+  total: number;
+  successful: number;
+  failed: number;
+  imported: Transaction[];
+  skipped: Transaction[];
+  errors: TransactionsImportError[];
+}

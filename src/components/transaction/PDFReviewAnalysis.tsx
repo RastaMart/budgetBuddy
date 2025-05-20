@@ -13,20 +13,16 @@ function PDFReviewAnalysis({
   onClose,
   onAccept,
 }: PDFReviewAnalysisProps) {
-  console.log('PDFReviewAnalysis');
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(true);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // console.log('PDFReviewAnalysis useEffect', pdfFile, user, error);
-
     processPDF();
   }, []);
 
   const processPDF = async () => {
-    console.log('processPDF');
     try {
       if (!user) throw new Error('User not found');
 
